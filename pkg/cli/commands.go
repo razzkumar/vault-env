@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/urfave/cli/v2"
 
@@ -15,6 +16,7 @@ func GetCommands() []*cli.Command {
 		getGetCommand(),
 		getEnvCommand(),
 		getSyncCommand(),
+		getRunCommand(),
 		getCompletionCommand(),
 	}
 }
@@ -226,6 +228,120 @@ func getSyncCommand() *cli.Command {
 	}
 }
 
+func getRunCommand() *cli.Command {
+	return &cli.Command{
+		Name:    "run",
+		Usage:   "Run command with secrets injected as environment variables",
+		Aliases: []string{"r"},
+		Description: `Run a command with secrets from Vault injected as environment variables.
+
+This command fetches secrets from Vault (using a config file or individual paths),
+decrypts them if needed, and injects them into the environment of the specified command.
+
+The command inherits your current environment and adds/overrides with Vault secrets.
+
+Examples:
+  # Run with config file (most common)
+  vault-env run --config secrets.yaml -- go run main.go
+  
+  # Run with default config file (vault-env.yaml)
+  vault-env run -- go run main.go
+  
+  # Run with inline secret injection
+  vault-env run --inject DB_PASSWORD=secrets/db_password -- ./myapp
+  
+  # Run with multiple secret injections
+  vault-env run --inject DB_PASSWORD=secrets/db_password --inject API_KEY=secrets/api_key -- npm start
+  
+  # Run with existing .env file plus Vault secrets
+  vault-env run --config secrets.yaml --env-file .env.local -- python app.py
+
+Note: Use -- to separate vault-env flags from the command to run.
+If vault-env.yaml exists in the current directory, it will be used automatically if no --config is specified.`,
+		ArgsUsage: "[-- command args...]",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:  "config",
+				Usage: "YAML config file with secret definitions (defaults to vault-env.yaml if exists)",
+			},
+			&cli.StringFlag{
+				Name:  "encryption-key",
+				Usage: "Transit encryption key name",
+			},
+			&cli.StringSliceFlag{
+				Name:  "inject",
+				Usage: "Inject specific secret as ENV_VAR=vault_path (can be used multiple times)",
+			},
+			&cli.StringFlag{
+				Name:  "env-file",
+				Usage: "Load additional environment variables from .env file",
+			},
+			&cli.StringFlag{
+				Name:  "kv-mount",
+				Usage: "KV v2 mount path",
+				Value: "kv",
+			},
+			&cli.StringFlag{
+				Name:  "transit-mount",
+				Usage: "Transit mount path",
+				Value: "transit",
+			},
+			&cli.BoolFlag{
+				Name:  "dry-run",
+				Usage: "Show environment variables that would be set without running the command",
+			},
+			&cli.BoolFlag{
+				Name:  "preserve-env",
+				Usage: "Preserve all current environment variables (default: true)",
+				Value: true,
+			},
+		},
+		Action: func(ctx *cli.Context) error {
+			// Check for default config file if none specified and no inject flags provided
+			configFile := ctx.String("config")
+			injectSecrets := ctx.StringSlice("inject")
+			
+			if configFile == "" && len(injectSecrets) == 0 {
+				// Check if vault-env.yaml exists in current directory only if no inject flags
+				if _, err := os.Stat("vault-env.yaml"); err == nil {
+					configFile = "vault-env.yaml"
+				}
+			}
+			
+			// Validate that we have either config or inject flags
+			if configFile == "" && len(injectSecrets) == 0 {
+				return fmt.Errorf("either --config, vault-env.yaml file, or --inject must be specified")
+			}
+
+			// Get the command to run (everything after --)
+			args := ctx.Args().Slice()
+			if len(args) == 0 {
+				return fmt.Errorf("command to run is required. Use -- to separate vault-env options from the command")
+			}
+
+			appInstance, err := app.New()
+			if err != nil {
+				return fmt.Errorf("failed to create app: %w", err)
+			}
+
+			opts := &app.RunOptions{
+				KVMount:       ctx.String("kv-mount"),
+				TransitMount:  ctx.String("transit-mount"),
+				EncryptionKey: ctx.String("encryption-key"),
+				ConfigFile:    configFile,
+				InjectSecrets: injectSecrets,
+				EnvFile:       ctx.String("env-file"),
+				DryRun:        ctx.Bool("dry-run"),
+				PreserveEnv:   ctx.Bool("preserve-env"),
+				Command:       args[0],
+				Args:          args[1:],
+			}
+
+			return appInstance.Run(opts)
+		},
+	}
+}
+
 func getCompletionCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "completion",
@@ -288,7 +404,7 @@ _vault_env_completion() {
     
     # Complete commands
     if [[ ${COMP_CWORD} -eq 1 ]]; then
-        opts="put get env sync completion help"
+        opts="put get env sync run completion help"
         COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
         return 0
     fi
@@ -306,6 +422,9 @@ _vault_env_completion() {
             ;;
         sync|s)
             opts="--config --output --help"
+            ;;
+        run|r)
+            opts="--config --encryption-key --inject --env-file --kv-mount --transit-mount --dry-run --preserve-env --help"
             ;;
         completion|comp)
             if [[ ${COMP_CWORD} -eq 2 ]]; then
@@ -381,6 +500,18 @@ _vault_env() {
                         '--output=[Output .env file]:file:_files' \
                         '--help[Show help]'
                     ;;
+                run|r)
+                    _arguments \
+                        '--config=[YAML config file]:file:_files' \
+                        '--encryption-key=[Transit encryption key name]:key:' \
+                        '--inject=[Inject specific secret]:inject:' \
+                        '--env-file=[Additional .env file]:file:_files' \
+                        '--kv-mount=[KV v2 mount path]:mount:' \
+                        '--transit-mount=[Transit mount path]:mount:' \
+                        '--dry-run[Show env vars without running]' \
+                        '--preserve-env[Preserve current environment]' \
+                        '--help[Show help]'
+                    ;;
                 completion|comp)
                     _arguments '1: :(bash zsh fish powershell)'
                     ;;
@@ -396,6 +527,7 @@ _vault_env_commands() {
         'get:Retrieve and decrypt secrets from Vault'
         'env:Generate .env file from multiple Vault secrets'
         'sync:Sync secrets from YAML config to .env file'
+        'run:Run command with secrets injected as environment variables'
         'completion:Generate shell completion scripts'
         'help:Show help'
     )
@@ -415,6 +547,7 @@ complete -c vault-env -f -n '__fish_use_subcommand' -a 'put' -d 'Store/update se
 complete -c vault-env -f -n '__fish_use_subcommand' -a 'get' -d 'Retrieve and decrypt secrets from Vault'
 complete -c vault-env -f -n '__fish_use_subcommand' -a 'env' -d 'Generate .env file from multiple Vault secrets'
 complete -c vault-env -f -n '__fish_use_subcommand' -a 'sync' -d 'Sync secrets from YAML config to .env file'
+complete -c vault-env -f -n '__fish_use_subcommand' -a 'run' -d 'Run command with secrets injected as environment variables'
 complete -c vault-env -f -n '__fish_use_subcommand' -a 'completion' -d 'Generate shell completion scripts'
 complete -c vault-env -f -n '__fish_use_subcommand' -a 'help' -d 'Show help'
 
@@ -423,6 +556,7 @@ complete -c vault-env -f -n '__fish_use_subcommand' -a 'p' -d 'Store/update secr
 complete -c vault-env -f -n '__fish_use_subcommand' -a 'g' -d 'Retrieve and decrypt secrets from Vault (alias)'
 complete -c vault-env -f -n '__fish_use_subcommand' -a 'e' -d 'Generate .env file from multiple Vault secrets (alias)'
 complete -c vault-env -f -n '__fish_use_subcommand' -a 's' -d 'Sync secrets from YAML config to .env file (alias)'
+complete -c vault-env -f -n '__fish_use_subcommand' -a 'r' -d 'Run command with secrets injected as environment variables (alias)'
 complete -c vault-env -f -n '__fish_use_subcommand' -a 'comp' -d 'Generate shell completion scripts (alias)'
 
 # Put command options
@@ -452,6 +586,16 @@ complete -c vault-env -f -n '__fish_seen_subcommand_from env e' -l 'output' -d '
 complete -c vault-env -f -n '__fish_seen_subcommand_from sync s' -l 'config' -d 'YAML config file'
 complete -c vault-env -f -n '__fish_seen_subcommand_from sync s' -l 'output' -d 'Output .env file'
 
+# Run command options
+complete -c vault-env -f -n '__fish_seen_subcommand_from run r' -l 'config' -d 'YAML config file with secret definitions'
+complete -c vault-env -f -n '__fish_seen_subcommand_from run r' -l 'encryption-key' -d 'Transit encryption key name'
+complete -c vault-env -f -n '__fish_seen_subcommand_from run r' -l 'inject' -d 'Inject specific secret as ENV_VAR=vault_path'
+complete -c vault-env -f -n '__fish_seen_subcommand_from run r' -l 'env-file' -d 'Load additional environment variables from .env file'
+complete -c vault-env -f -n '__fish_seen_subcommand_from run r' -l 'kv-mount' -d 'KV v2 mount path'
+complete -c vault-env -f -n '__fish_seen_subcommand_from run r' -l 'transit-mount' -d 'Transit mount path'
+complete -c vault-env -f -n '__fish_seen_subcommand_from run r' -l 'dry-run' -d 'Show environment variables without running command'
+complete -c vault-env -f -n '__fish_seen_subcommand_from run r' -l 'preserve-env' -d 'Preserve all current environment variables'
+
 # Completion command options
 complete -c vault-env -f -n '__fish_seen_subcommand_from completion comp' -a 'bash' -d 'Generate bash completion'
 complete -c vault-env -f -n '__fish_seen_subcommand_from completion comp' -a 'zsh' -d 'Generate zsh completion'
@@ -475,8 +619,8 @@ func generatePowerShellCompletion(ctx *cli.Context) error {
 Register-ArgumentCompleter -Native -CommandName vault-env -ScriptBlock {
     param($commandName, $wordToComplete, $cursorPosition)
     
-    $commands = @('put', 'get', 'env', 'sync', 'completion', 'help')
-    $aliases = @('p', 'g', 'e', 's', 'comp', 'h')
+    $commands = @('put', 'get', 'env', 'sync', 'run', 'completion', 'help')
+    $aliases = @('p', 'g', 'e', 's', 'r', 'comp', 'h')
     
     # Split the command line
     $commandElements = $wordToComplete.Split(' ', [System.StringSplitOptions]::RemoveEmptyEntries)
@@ -499,6 +643,9 @@ Register-ArgumentCompleter -Native -CommandName vault-env -ScriptBlock {
         }
         { $_ -in @('sync', 's') } {
             return @('--config', '--output', '--help') | Where-Object { $_ -like "$wordToComplete*" }
+        }
+        { $_ -in @('run', 'r') } {
+            return @('--config', '--encryption-key', '--inject', '--env-file', '--kv-mount', '--transit-mount', '--dry-run', '--preserve-env', '--help') | Where-Object { $_ -like "$wordToComplete*" }
         }
         { $_ -in @('completion', 'comp') } {
             return @('bash', 'zsh', 'fish', 'powershell') | Where-Object { $_ -like "$wordToComplete*" }
