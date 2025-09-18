@@ -1,0 +1,35 @@
+---
+version: 1
+vault:
+  addr: "https://vault.example.com:8200"  # optional; else VAULT_ADDR env
+  namespace: ""                           # optional; else VAULT_NAMESPACE env
+  skip_verify: false                      # optional; else VAULT_SKIP_VERIFY env
+  ca_cert: "/etc/ssl/certs/vault-ca.pem" # optional; else VAULT_CACERT env
+
+transit:
+  mount: "transit"                        # Vault transit secrets engine mount
+  key: "app-secrets"                      # Transit encryption key name
+
+kv:
+  mount: "kv"                            # Vault KV v2 secrets engine mount
+
+secrets:
+  - name: "Database Password"
+    kv_path: "myapp/prod/db_password"    # Path in KV store
+    env_var: "DB_PASSWORD"               # Environment variable name
+    required: true                       # Fail if this secret is missing
+
+  - name: "API Key"
+    kv_path: "myapp/prod/api_key"
+    env_var: "API_KEY"
+    required: true
+
+  - name: "JWT Secret"
+    kv_path: "myapp/prod/jwt_secret"
+    env_var: "JWT_SECRET"
+    required: false
+
+  - name: "Redis Password"
+    kv_path: "myapp/prod/redis_password"
+    env_var: "REDIS_PASSWORD" 
+    required: false

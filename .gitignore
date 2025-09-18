@@ -1,0 +1,30 @@
+# Binary
+vault-env
+vault-env-*
+
+# Environment files
+.env
+.env.*
+*.env
+
+# Vault config files with secrets
+config.yaml
+secrets.yaml
+vault-env.yaml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Go
+*.test
+*.out
+/vendor/
+/dist/
