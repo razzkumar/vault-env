@@ -1,0 +1,34 @@
+# Comprehensive vault-env configuration showing all supported formats
+kv:
+  mount: kv
+
+# Optional transit encryption (can be omitted)
+# transit:
+#   mount: transit
+#   key: myapp-key
+
+secrets:
+  # ===== PATH-BASED FORMATS (NEW) =====
+  
+  # 1. Load ALL keys from a path as environment variables
+  # All keys become UPPERCASE env vars (e.g., db_password → DB_PASSWORD)
+  - path: myapp/config
+  
+  # 2. Load SINGLE key from path (key name becomes env var name)
+  # Creates: DB_PASSWORD=secret123
+  - path: myapp/config
+    key: db_password
+    
+  # 3. Load SINGLE key from path with CUSTOM env var name
+  # Creates: DATABASE_PASS=secret123 (instead of DB_PASSWORD)
+  - path: myapp/config
+    key: db_password
+    env_key: DATABASE_PASS
+  
+  # ===== INDIVIDUAL FORMAT (OLD - still supported) =====
+  
+  # 4. Individual secret mapping (legacy format)
+  - name: jwt_secret
+    kv_path: myapp/jwt
+    env_var: JWT_SECRET
+    required: true

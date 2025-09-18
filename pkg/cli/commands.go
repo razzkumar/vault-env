@@ -14,7 +14,6 @@ func GetCommands() []*cli.Command {
 	return []*cli.Command{
 		getPutCommand(),
 		getGetCommand(),
-		getEnvCommand(),
 		getSyncCommand(),
 		getRunCommand(),
 		getCompletionCommand(),
@@ -111,11 +110,28 @@ func getGetCommand() *cli.Command {
 		Name:    "get",
 		Usage:   "Retrieve and optionally decrypt secrets from Vault",
 		Aliases: []string{"g"},
+		Description: `Retrieve secrets from Vault either by direct path or from a config file.
+
+Examples:
+  # Get secrets from specific path
+  vault-env get --path secrets/prod
+  
+  # Get all secrets from config file
+  vault-env get --config secrets.yaml
+  
+  # Get secrets from default config file (vault-env.yaml)
+  vault-env get
+  
+  # Output as JSON
+  vault-env get --config secrets.yaml --json`,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
-				Name:     "path",
-				Usage:    "KV path to retrieve secret",
-				Required: true,
+				Name:  "path",
+				Usage: "KV path to retrieve secret",
+			},
+			&cli.StringFlag{
+				Name:  "config",
+				Usage: "YAML config file with secret definitions (defaults to vault-env.yaml if exists)",
 			},
 			&cli.StringFlag{
 				Name:  "encryption-key",
@@ -141,57 +157,42 @@ func getGetCommand() *cli.Command {
 			},
 		},
 		Action: func(ctx *cli.Context) error {
+			// Check for default config file if neither path nor config specified
+			configFile := ctx.String("config")
+			kvPath := ctx.String("path")
+			
+			if configFile == "" && kvPath == "" {
+				// Check if vault-env.yaml exists in current directory
+				if _, err := os.Stat("vault-env.yaml"); err == nil {
+					configFile = "vault-env.yaml"
+				}
+			}
+			
+			// Validate that we have either path or config
+			if kvPath == "" && configFile == "" {
+				return fmt.Errorf("either --path, --config, or vault-env.yaml file must be specified")
+			}
+
 			appInstance, err := app.New()
 			if err != nil {
 				return fmt.Errorf("failed to create app: %w", err)
 			}
-
-			opts := &app.GetOptions{
-				KVMount:       ctx.String("kv-mount"),
-				KVPath:        ctx.String("path"),
-				TransitMount:  ctx.String("transit-mount"),
-				EncryptionKey: ctx.String("encryption-key"),
-				Key:           ctx.String("key"),
-				OutputJSON:    ctx.Bool("json"),
+			
+			if configFile != "" {
+				// Use config file to get all secrets
+				return appInstance.GetFromConfig(configFile, ctx.String("encryption-key"), ctx.Bool("json"))
+			} else {
+				// Use direct path
+				opts := &app.GetOptions{
+					KVMount:       ctx.String("kv-mount"),
+					KVPath:        kvPath,
+					TransitMount:  ctx.String("transit-mount"),
+					EncryptionKey: ctx.String("encryption-key"),
+					Key:           ctx.String("key"),
+					OutputJSON:    ctx.Bool("json"),
+				}
+				return appInstance.Get(opts)
 			}
-
-			return appInstance.Get(opts)
-		},
-	}
-}
-
-func getEnvCommand() *cli.Command {
-	return &cli.Command{
-		Name:    "env",
-		Usage:   "Generate .env file from multiple Vault secrets",
-		Aliases: []string{"e"},
-		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:     "config",
-				Usage:    "YAML config file with secret definitions",
-				Required: true,
-			},
-			&cli.StringFlag{
-				Name:  "encryption-key",
-				Usage: "Transit encryption key name",
-			},
-			&cli.StringFlag{
-				Name:  "output",
-				Usage: "Output .env file",
-				Value: ".env",
-			},
-		},
-		Action: func(ctx *cli.Context) error {
-			appInstance, err := app.New()
-			if err != nil {
-				return fmt.Errorf("failed to create app: %w", err)
-			}
-
-			return appInstance.GenerateEnvFile(
-				ctx.String("config"),
-				ctx.String("output"),
-				ctx.String("encryption-key"),
-			)
 		},
 	}
 }
@@ -404,7 +405,7 @@ _vault_env_completion() {
     
     # Complete commands
     if [[ ${COMP_CWORD} -eq 1 ]]; then
-        opts="put get env sync run completion help"
+        opts="put get sync run completion help"
         COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
         return 0
     fi
@@ -415,10 +416,7 @@ _vault_env_completion() {
             opts="--path --encryption-key --key --value --from-env --from-file --kv-mount --transit-mount --help"
             ;;
         get|g)
-            opts="--path --encryption-key --key --json --kv-mount --transit-mount --help"
-            ;;
-        env|e)
-            opts="--config --encryption-key --output --help"
+            opts="--path --config --encryption-key --key --json --kv-mount --transit-mount --help"
             ;;
         sync|s)
             opts="--config --output --help"
@@ -480,18 +478,12 @@ _vault_env() {
                 get|g)
                     _arguments \
                         '--path=[KV path to retrieve secret]:path:' \
+                        '--config=[YAML config file]:file:_files' \
                         '--encryption-key=[Transit encryption key name]:key:' \
                         '--key=[Specific key to retrieve]:key:' \
                         '--json[Output as JSON format]' \
                         '--kv-mount=[KV v2 mount path]:mount:' \
                         '--transit-mount=[Transit mount path]:mount:' \
-                        '--help[Show help]'
-                    ;;
-                env|e)
-                    _arguments \
-                        '--config=[YAML config file]:file:_files' \
-                        '--encryption-key=[Transit encryption key name]:key:' \
-                        '--output=[Output .env file]:file:_files' \
                         '--help[Show help]'
                     ;;
                 sync|s)
@@ -525,7 +517,6 @@ _vault_env_commands() {
     commands=(
         'put:Store/update secrets in Vault'
         'get:Retrieve and decrypt secrets from Vault'
-        'env:Generate .env file from multiple Vault secrets'
         'sync:Sync secrets from YAML config to .env file'
         'run:Run command with secrets injected as environment variables'
         'completion:Generate shell completion scripts'
@@ -545,7 +536,6 @@ func generateFishCompletion(ctx *cli.Context) error {
 # Commands
 complete -c vault-env -f -n '__fish_use_subcommand' -a 'put' -d 'Store/update secrets in Vault'
 complete -c vault-env -f -n '__fish_use_subcommand' -a 'get' -d 'Retrieve and decrypt secrets from Vault'
-complete -c vault-env -f -n '__fish_use_subcommand' -a 'env' -d 'Generate .env file from multiple Vault secrets'
 complete -c vault-env -f -n '__fish_use_subcommand' -a 'sync' -d 'Sync secrets from YAML config to .env file'
 complete -c vault-env -f -n '__fish_use_subcommand' -a 'run' -d 'Run command with secrets injected as environment variables'
 complete -c vault-env -f -n '__fish_use_subcommand' -a 'completion' -d 'Generate shell completion scripts'
@@ -554,7 +544,6 @@ complete -c vault-env -f -n '__fish_use_subcommand' -a 'help' -d 'Show help'
 # Aliases
 complete -c vault-env -f -n '__fish_use_subcommand' -a 'p' -d 'Store/update secrets in Vault (alias)'
 complete -c vault-env -f -n '__fish_use_subcommand' -a 'g' -d 'Retrieve and decrypt secrets from Vault (alias)'
-complete -c vault-env -f -n '__fish_use_subcommand' -a 'e' -d 'Generate .env file from multiple Vault secrets (alias)'
 complete -c vault-env -f -n '__fish_use_subcommand' -a 's' -d 'Sync secrets from YAML config to .env file (alias)'
 complete -c vault-env -f -n '__fish_use_subcommand' -a 'r' -d 'Run command with secrets injected as environment variables (alias)'
 complete -c vault-env -f -n '__fish_use_subcommand' -a 'comp' -d 'Generate shell completion scripts (alias)'
@@ -571,16 +560,12 @@ complete -c vault-env -f -n '__fish_seen_subcommand_from put p' -l 'transit-moun
 
 # Get command options
 complete -c vault-env -f -n '__fish_seen_subcommand_from get g' -l 'path' -d 'KV path to retrieve secret'
+complete -c vault-env -f -n '__fish_seen_subcommand_from get g' -l 'config' -d 'YAML config file with secret definitions'
 complete -c vault-env -f -n '__fish_seen_subcommand_from get g' -l 'encryption-key' -d 'Transit encryption key name'
 complete -c vault-env -f -n '__fish_seen_subcommand_from get g' -l 'key' -d 'Specific key to retrieve'
 complete -c vault-env -f -n '__fish_seen_subcommand_from get g' -l 'json' -d 'Output as JSON format'
 complete -c vault-env -f -n '__fish_seen_subcommand_from get g' -l 'kv-mount' -d 'KV v2 mount path'
 complete -c vault-env -f -n '__fish_seen_subcommand_from get g' -l 'transit-mount' -d 'Transit mount path'
-
-# Env command options
-complete -c vault-env -f -n '__fish_seen_subcommand_from env e' -l 'config' -d 'YAML config file with secret definitions'
-complete -c vault-env -f -n '__fish_seen_subcommand_from env e' -l 'encryption-key' -d 'Transit encryption key name'
-complete -c vault-env -f -n '__fish_seen_subcommand_from env e' -l 'output' -d 'Output .env file'
 
 # Sync command options
 complete -c vault-env -f -n '__fish_seen_subcommand_from sync s' -l 'config' -d 'YAML config file'
@@ -619,8 +604,8 @@ func generatePowerShellCompletion(ctx *cli.Context) error {
 Register-ArgumentCompleter -Native -CommandName vault-env -ScriptBlock {
     param($commandName, $wordToComplete, $cursorPosition)
     
-    $commands = @('put', 'get', 'env', 'sync', 'run', 'completion', 'help')
-    $aliases = @('p', 'g', 'e', 's', 'r', 'comp', 'h')
+    $commands = @('put', 'get', 'sync', 'run', 'completion', 'help')
+    $aliases = @('p', 'g', 's', 'r', 'comp', 'h')
     
     # Split the command line
     $commandElements = $wordToComplete.Split(' ', [System.StringSplitOptions]::RemoveEmptyEntries)
@@ -636,10 +621,7 @@ Register-ArgumentCompleter -Native -CommandName vault-env -ScriptBlock {
             return @('--path', '--encryption-key', '--key', '--value', '--from-env', '--from-file', '--kv-mount', '--transit-mount', '--help') | Where-Object { $_ -like "$wordToComplete*" }
         }
         { $_ -in @('get', 'g') } {
-            return @('--path', '--encryption-key', '--key', '--json', '--kv-mount', '--transit-mount', '--help') | Where-Object { $_ -like "$wordToComplete*" }
-        }
-        { $_ -in @('env', 'e') } {
-            return @('--config', '--encryption-key', '--output', '--help') | Where-Object { $_ -like "$wordToComplete*" }
+            return @('--path', '--config', '--encryption-key', '--key', '--json', '--kv-mount', '--transit-mount', '--help') | Where-Object { $_ -like "$wordToComplete*" }
         }
         { $_ -in @('sync', 's') } {
             return @('--config', '--output', '--help') | Where-Object { $_ -like "$wordToComplete*" }

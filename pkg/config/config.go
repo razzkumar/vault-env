@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 )
 
 // Config holds the application configuration
@@ -14,10 +15,10 @@ type Config struct {
 		SkipVerify bool   `yaml:"skip_verify"`
 		CACert     string `yaml:"ca_cert"`
 	} `yaml:"vault"`
-	Transit struct {
+	Transit *struct {
 		Mount string `yaml:"mount"`
 		Key   string `yaml:"key"`
-	} `yaml:"transit"`
+	} `yaml:"transit,omitempty"`
 	KV struct {
 		Mount string `yaml:"mount"`
 	} `yaml:"kv"`
@@ -25,11 +26,22 @@ type Config struct {
 }
 
 // SecretEntry represents a secret configuration entry
+// Supports multiple formats:
+// 1. Old format: individual secret mapping (name, kv_path, env_var)
+// 2. New format: all keys from path (path only)
+// 3. Selective format: single key from path (path + key)
+// 4. Mapped format: single key from path with custom env name (path + key + env_key)
 type SecretEntry struct {
-	Name     string `yaml:"name"`
-	KVPath   string `yaml:"kv_path"`   // path under kv mount
-	EnvVar   string `yaml:"env_var"`   // environment variable name
-	Required bool   `yaml:"required"`  // fail if secret not found
+	// Old format - individual secret mapping
+	Name     string `yaml:"name,omitempty"`
+	KVPath   string `yaml:"kv_path,omitempty"` // path under kv mount
+	EnvVar   string `yaml:"env_var,omitempty"` // environment variable name
+	Required bool   `yaml:"required,omitempty"` // fail if secret not found
+	
+	// New formats - path-based
+	Path   string `yaml:"path,omitempty"`    // vault path
+	Key    string `yaml:"key,omitempty"`     // specific key to extract (optional)
+	EnvKey string `yaml:"env_key,omitempty"` // custom env var name (optional, requires key)
 }
 
 // VaultConfig holds Vault client configuration
@@ -90,6 +102,53 @@ func NonEmpty(values ...string) string {
 		if v != "" {
 			return v
 		}
+	}
+	return ""
+}
+
+// IsPathBased returns true if this secret entry uses the new path-based format
+func (s *SecretEntry) IsPathBased() bool {
+	return s.Path != ""
+}
+
+// IsIndividual returns true if this secret entry uses the old individual format
+func (s *SecretEntry) IsIndividual() bool {
+	return s.KVPath != "" && s.EnvVar != ""
+}
+
+// IsPathAllKeys returns true if this loads all keys from the path
+func (s *SecretEntry) IsPathAllKeys() bool {
+	return s.Path != "" && s.Key == ""
+}
+
+// IsPathSingleKey returns true if this loads a single key from the path
+func (s *SecretEntry) IsPathSingleKey() bool {
+	return s.Path != "" && s.Key != ""
+}
+
+// GetEnvKeyName returns the environment variable name for this secret
+func (s *SecretEntry) GetEnvKeyName() string {
+	if s.EnvKey != "" {
+		return s.EnvKey
+	}
+	if s.Key != "" {
+		return strings.ToUpper(s.Key)
+	}
+	return ""
+}
+
+// GetTransitMount returns the transit mount path, with fallback
+func (c *Config) GetTransitMount(defaultMount string) string {
+	if c.Transit != nil && c.Transit.Mount != "" {
+		return c.Transit.Mount
+	}
+	return defaultMount
+}
+
+// GetTransitKey returns the transit encryption key
+func (c *Config) GetTransitKey() string {
+	if c.Transit != nil {
+		return c.Transit.Key
 	}
 	return ""
 }
