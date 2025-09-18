@@ -1,6 +1,23 @@
 # vault-env
 
-A minimal CLI tool for managing secrets with HashiCorp Vault using Transit encryption, inspired by [vaultx](https://github.com/hashicorp/vault) and [teller](https://github.com/tellerops/teller).
+A professional CLI tool for managing secrets with HashiCorp Vault using optional Transit encryption, inspired by [vaultx](https://github.com/hashicorp/vault) and [teller](https://github.com/tellerops/teller).
+
+**Version 2.0** features a complete rewrite with modern Go practices, proper project structure, and enhanced libraries.
+
+## Architecture
+
+```
+vault-env/
+├── cmd/vault-env/          # Main application entry point
+├── pkg/
+│   ├── config/             # Configuration management
+│   ├── vault/              # Vault client wrapper
+│   └── cli/                # CLI command definitions
+├── internal/
+│   ├── app/                # Application business logic
+│   └── utils/              # Utility functions
+└── examples/               # Example configurations
+```
 
 ## Features
 
@@ -20,13 +37,19 @@ A minimal CLI tool for managing secrets with HashiCorp Vault using Transit encry
 - **Plaintext storage**: Option to store secrets without additional encryption
 - **Flexible key requirement**: Transit key only required when encryption is enabled
 
+## Built With
+
+- **[urfave/cli v2](https://github.com/urfave/cli)** - Modern CLI framework with advanced features
+- **[joho/godotenv](https://github.com/joho/godotenv)** - Professional .env file parsing
+- **[HashiCorp Vault API](https://github.com/hashicorp/vault/api)** - Official Vault Go client
+
 ## Requirements
 
 - HashiCorp Vault server with:
   - Transit secrets engine enabled (default mount: `transit`)
   - KV v2 secrets engine enabled (default mount: `kv`) 
   - A transit encryption key created
-- Go 1.20+ (for building from source)
+- Go 1.21+ (for building from source)
 
 ## Installation
 
