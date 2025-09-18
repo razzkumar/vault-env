@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -52,6 +53,21 @@ type VaultConfig struct {
 	CACert     string
 	SkipVerify bool
 	Timeout    int // seconds
+	
+	// Authentication methods
+	AuthMethod string // auto-detected or explicitly set
+	
+	// AppRole auth
+	RoleID   string
+	SecretID string
+	
+	// GitHub auth
+	GitHubToken string
+	
+	// Kubernetes auth
+	K8sRole        string
+	K8sJWTPath     string // defaults to /var/run/secrets/kubernetes.io/serviceaccount/token
+	K8sAuthPath    string // defaults to kubernetes
 }
 
 // GetVaultConfigFromEnv creates VaultConfig from environment variables
@@ -62,6 +78,21 @@ func GetVaultConfigFromEnv() *VaultConfig {
 		Namespace: os.Getenv("VAULT_NAMESPACE"),
 		CACert:    os.Getenv("VAULT_CACERT"),
 		Timeout:   15, // default timeout
+		
+		// Auth method (explicit or auto-detected)
+		AuthMethod: strings.ToLower(os.Getenv("VAULT_AUTH_METHOD")),
+		
+		// AppRole auth
+		RoleID:   os.Getenv("VAULT_ROLE_ID"),
+		SecretID: os.Getenv("VAULT_SECRET_ID"),
+		
+		// GitHub auth
+		GitHubToken: os.Getenv("VAULT_GITHUB_TOKEN"),
+		
+		// Kubernetes auth
+		K8sRole:     os.Getenv("VAULT_K8S_ROLE"),
+		K8sJWTPath:  os.Getenv("VAULT_K8S_JWT_PATH"),
+		K8sAuthPath: os.Getenv("VAULT_K8S_AUTH_PATH"),
 	}
 
 	if skip := os.Getenv("VAULT_SKIP_VERIFY"); skip == "1" || skip == "true" {
@@ -73,6 +104,14 @@ func GetVaultConfigFromEnv() *VaultConfig {
 			cfg.Timeout = t
 		}
 	}
+	
+	// Set defaults for Kubernetes auth
+	if cfg.K8sJWTPath == "" {
+		cfg.K8sJWTPath = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+	}
+	if cfg.K8sAuthPath == "" {
+		cfg.K8sAuthPath = "kubernetes"
+	}
 
 	return cfg
 }
@@ -82,10 +121,57 @@ func (c *VaultConfig) Validate() error {
 	if c.Addr == "" {
 		return ErrMissingVaultAddr
 	}
-	if c.Token == "" {
-		return ErrMissingVaultToken
+	
+	// Auto-detect auth method if not explicitly set
+	if c.AuthMethod == "" {
+		c.AuthMethod = c.DetectAuthMethod()
 	}
+	
+	// Validate based on auth method
+	switch c.AuthMethod {
+	case "token":
+		if c.Token == "" {
+			return ErrMissingVaultToken
+		}
+	case "approle":
+		if c.RoleID == "" {
+			return fmt.Errorf("VAULT_ROLE_ID is required for AppRole auth")
+		}
+		if c.SecretID == "" {
+			return fmt.Errorf("VAULT_SECRET_ID is required for AppRole auth")
+		}
+	case "github":
+		if c.GitHubToken == "" {
+			return fmt.Errorf("VAULT_GITHUB_TOKEN is required for GitHub auth")
+		}
+	case "kubernetes":
+		if c.K8sRole == "" {
+			return fmt.Errorf("VAULT_K8S_ROLE is required for Kubernetes auth")
+		}
+	default:
+		return fmt.Errorf("unsupported or auto-detected auth method: %s. Supported: token, approle, github, kubernetes", c.AuthMethod)
+	}
+	
 	return nil
+}
+
+// DetectAuthMethod auto-detects the auth method based on available credentials
+func (c *VaultConfig) DetectAuthMethod() string {
+	// Priority order for auto-detection
+	if c.Token != "" {
+		return "token"
+	}
+	if c.RoleID != "" && c.SecretID != "" {
+		return "approle"
+	}
+	if c.GitHubToken != "" {
+		return "github"
+	}
+	if c.K8sRole != "" {
+		return "kubernetes"
+	}
+	// Default to token if nothing else detected
+	return "token"
 }
 
 // GetEncryptionKey returns the encryption key from environment or parameter

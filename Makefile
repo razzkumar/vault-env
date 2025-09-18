@@ -2,7 +2,7 @@
 
 BINARY_NAME=vault-env
 BINARY_PATH=./$(BINARY_NAME)
-MAIN_PATH=./cmd/vault-env
+MAIN_PATH=./cmd/cli
 
 .PHONY: all build clean install uninstall test fmt vet help
 

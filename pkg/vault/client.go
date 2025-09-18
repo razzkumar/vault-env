@@ -7,10 +7,12 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
 	vaultapi "github.com/hashicorp/vault/api"
+	// Auth methods implemented directly
 
 	"github.com/razzkumar/vault-env/pkg/config"
 )
@@ -50,7 +52,13 @@ func NewClient(cfg *config.VaultConfig) (*Client, error) {
 		client.SetNamespace(cfg.Namespace)
 	}
 
-	client.SetToken(cfg.Token)
+	// Authenticate and get token
+	token, err := authenticateVault(client, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("authentication failed: %w", err)
+	}
+	
+	client.SetToken(token)
 
 	// Configure TLS properly
 	if tr, ok := vaultConfig.HttpClient.Transport.(*http.Transport); ok && tr.TLSClientConfig == nil {
@@ -159,4 +167,97 @@ func (c *Client) KVGet(mount, path string) (map[string]interface{}, error) {
 	}
 
 	return inner, nil
+}
+
+// authenticateVault performs authentication based on the configured method
+func authenticateVault(client *vaultapi.Client, cfg *config.VaultConfig) (string, error) {
+	switch cfg.AuthMethod {
+	case "token":
+		if cfg.Token == "" {
+			return "", fmt.Errorf("token is required for token auth")
+		}
+		return cfg.Token, nil
+		
+	case "approle":
+		return authenticateAppRole(client, cfg)
+		
+	case "github":
+		return authenticateGitHub(client, cfg)
+		
+	case "kubernetes":
+		return authenticateKubernetes(client, cfg)
+		
+	default:
+		return "", fmt.Errorf("unsupported auth method: %s", cfg.AuthMethod)
+	}
+}
+
+// authenticateAppRole performs AppRole authentication
+func authenticateAppRole(client *vaultapi.Client, cfg *config.VaultConfig) (string, error) {
+	data := map[string]interface{}{
+		"role_id":   cfg.RoleID,
+		"secret_id": cfg.SecretID,
+	}
+	
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(cfg.Timeout)*time.Second)
+	defer cancel()
+	
+	secret, err := client.Logical().WriteWithContext(ctx, "auth/approle/login", data)
+	if err != nil {
+		return "", fmt.Errorf("unable to login to AppRole auth method: %w", err)
+	}
+	if secret == nil || secret.Auth == nil {
+		return "", fmt.Errorf("no auth info was returned after login")
+	}
+
+	return secret.Auth.ClientToken, nil
+}
+
+// authenticateGitHub performs GitHub personal access token authentication
+func authenticateGitHub(client *vaultapi.Client, cfg *config.VaultConfig) (string, error) {
+	data := map[string]interface{}{
+		"token": cfg.GitHubToken,
+	}
+	
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(cfg.Timeout)*time.Second)
+	defer cancel()
+	
+	secret, err := client.Logical().WriteWithContext(ctx, "auth/github/login", data)
+	if err != nil {
+		return "", fmt.Errorf("unable to login to GitHub auth method: %w", err)
+	}
+	if secret == nil || secret.Auth == nil {
+		return "", fmt.Errorf("no auth info was returned after login")
+	}
+
+	return secret.Auth.ClientToken, nil
+}
+
+// authenticateKubernetes performs Kubernetes service account authentication
+func authenticateKubernetes(client *vaultapi.Client, cfg *config.VaultConfig) (string, error) {
+	// Read the service account token
+	jwtBytes, err := os.ReadFile(cfg.K8sJWTPath)
+	if err != nil {
+		return "", fmt.Errorf("unable to read Kubernetes JWT token from %s: %w", cfg.K8sJWTPath, err)
+	}
+	jwt := strings.TrimSpace(string(jwtBytes))
+
+	data := map[string]interface{}{
+		"role": cfg.K8sRole,
+		"jwt":  jwt,
+	}
+	
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(cfg.Timeout)*time.Second)
+	defer cancel()
+	
+	path := fmt.Sprintf("auth/%s/login", cfg.K8sAuthPath)
+	secret, err := client.Logical().WriteWithContext(ctx, path, data)
+	if err != nil {
+		return "", fmt.Errorf("unable to login to Kubernetes auth method: %w", err)
+	}
+	if secret == nil || secret.Auth == nil {
+		return "", fmt.Errorf("no auth info was returned after login")
+	}
+
+	return secret.Auth.ClientToken, nil
 }
