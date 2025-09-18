@@ -4,12 +4,21 @@ A minimal CLI tool for managing secrets with HashiCorp Vault using Transit encry
 
 ## Features
 
-- **put**: Store secrets in Vault with Transit encryption
-- **get**: Retrieve and decrypt secrets from Vault  
+- **put**: Store secrets in Vault (optionally with Transit encryption)
+  - Single key-value pairs
+  - Multiple values from .env files
+  - File content as base64-encoded values
+- **get**: Retrieve and optionally decrypt secrets from Vault
+  - Single values or multi-value retrieval
+  - JSON or .env format output
+  - Specific subkey extraction
 - **env**: Generate .env file from multiple Vault secrets
 - **sync**: Sync secrets from YAML config to .env file
 
-All secrets are encrypted using Vault's Transit secrets engine before being stored in the KV v2 engine, providing an extra layer of security.
+**Encryption Options:**
+- **Transit encryption (default)**: Secrets encrypted using Vault's Transit engine before storage
+- **Plaintext storage**: Option to store secrets without additional encryption
+- **Flexible key requirement**: Transit key only required when encryption is enabled
 
 ## Requirements
 
@@ -58,26 +67,44 @@ vault write -f transit/keys/app-secrets
 
 ## Usage
 
-### Store a Secret
+### Store Secrets
 
 ```bash
-# Store from command line
+# Store single secret with encryption (default)
 vault-env put --key app-secrets --path myapp/db_password --value "supersecret"
+
+# Store single secret without encryption
+vault-env put --path myapp/db_password --value "supersecret" --no-encrypt
 
 # Store from stdin
 echo "supersecret" | vault-env put --key app-secrets --path myapp/db_password
 
-# Store from file  
-cat secret.txt | vault-env put --key app-secrets --path myapp/api_key
+# Store multiple secrets from .env file
+vault-env put --key app-secrets --path myapp/config --from-env production.env
+
+# Store file content as base64 (useful for SSH keys, certificates)
+vault-env put --key app-secrets --path myapp/ssh_key --from-file ~/.ssh/id_rsa
 ```
 
-### Retrieve a Secret
+### Retrieve Secrets
 
 ```bash
-# Get secret to stdout
+# Get single encrypted secret
 vault-env get --key app-secrets --path myapp/db_password
 
-# Get secret and use in another command
+# Get multiple secrets as JSON
+vault-env get --key app-secrets --path myapp/config --json
+
+# Get multiple secrets as .env format
+vault-env get --key app-secrets --path myapp/config
+
+# Get specific value from multi-value secret
+vault-env get --key app-secrets --path myapp/config --subkey AWS_ACCESS_KEY_ID
+
+# Get plaintext secret (no key needed)
+vault-env get --path myapp/plaintext_config --subkey EMAIL_FROM
+
+# Use in environment variable
 export DB_PASSWORD=$(vault-env get --key app-secrets --path myapp/db_password)
 ```
 

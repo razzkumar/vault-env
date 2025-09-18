@@ -19,6 +19,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -90,11 +91,11 @@ func main() {
 }
 
 func usage() {
-	fmt.Print(`vault-env - Minimal secrets management with Vault Transit encryption
+	fmt.Print(`vault-env - Minimal secrets management with Vault (optionally with Transit encryption)
 
 COMMANDS:
-  put       Store a secret in Vault with Transit encryption
-  get       Retrieve and decrypt a secret from Vault
+  put       Store secrets in Vault (with optional Transit encryption)
+  get       Retrieve and optionally decrypt secrets from Vault
   env       Generate .env file from multiple Vault secrets
   sync      Sync secrets from YAML config to .env file
 
@@ -103,16 +104,24 @@ ENVIRONMENT:
   VAULT_NAMESPACE, VAULT_CACERT, VAULT_SKIP_VERIFY (optional)
 
 EXAMPLES:
-  # Store a secret
+  # Store a single secret with transit encryption (default)
   vault-env put --key mykey --path secrets/db_password --value "supersecret"
-  echo "supersecret" | vault-env put --key mykey --path secrets/db_password
-
+  
+  # Store a single secret without transit encryption
+  vault-env put --path secrets/db_password --value "supersecret" --no-encrypt
+  
+  # Store multiple secrets from .env file
+  vault-env put --key mykey --path secrets/myapp --from-env .env
+  
+  # Store file as base64 encoded value
+  vault-env put --key mykey --path secrets/ssh_key --from-file ~/.ssh/id_rsa
+  
   # Retrieve a secret
   vault-env get --key mykey --path secrets/db_password
-
+  
   # Generate .env from multiple secrets
   vault-env env --key mykey --config secrets.yaml --output .env
-
+  
   # Sync from config file
   vault-env sync --config secrets.yaml
 `)
@@ -123,59 +132,113 @@ EXAMPLES:
 func cmdPut(args []string) {
 	fs := flag.NewFlagSet("put", flag.ExitOnError)
 	kvMount := fs.String("kv-mount", "kv", "KV v2 mount path")
-	kvPath := fs.String("path", "", "KV path to store secret")
+	kvPath := fs.String("path", "", "KV path to store secret(s)")
 	transitMount := fs.String("transit-mount", "transit", "Transit mount path")
-	keyName := fs.String("key", "", "Transit key name")
+	keyName := fs.String("key", "", "Transit key name (optional, enables encryption)")
 	value := fs.String("value", "", "Secret value (or use stdin)")
+	fromEnv := fs.String("from-env", "", "Load multiple key-value pairs from .env file")
+	fromFile := fs.String("from-file", "", "Load file content as base64 encoded value")
+	noEncrypt := fs.Bool("no-encrypt", false, "Disable transit encryption (store as plaintext)")
 	fs.Parse(args)
 
-	if *kvPath == "" || *keyName == "" {
+	if *kvPath == "" {
 		fs.Usage()
-		log.Fatal("--path and --key are required")
+		log.Fatal("--path is required")
+	}
+
+	// Validate input options
+	inputCount := 0
+	if *value != "" {
+		inputCount++
+	}
+	if *fromEnv != "" {
+		inputCount++
+	}
+	if *fromFile != "" {
+		inputCount++
+	}
+
+	if inputCount > 1 {
+		log.Fatal("only one of --value, --from-env, or --from-file can be specified")
 	}
 
 	client := mustVaultClientFromEnv()
 
-	// Read secret value
-	var secretValue []byte
+	// Determine if we should use encryption
+	useEncryption := *keyName != "" && !*noEncrypt
+	if useEncryption && *keyName == "" {
+		log.Fatal("--key is required when encryption is enabled")
+	}
+
+	var data map[string]interface{}
 	var err error
 
-	if *value != "" {
-		secretValue = []byte(*value)
-	} else {
-		// Read from stdin
-		secretValue, err = io.ReadAll(os.Stdin)
+	if *fromEnv != "" {
+		// Load from .env file
+		data, err = loadEnvFile(*fromEnv, client, *transitMount, *keyName, useEncryption)
 		if err != nil {
-			log.Fatalf("read stdin: %v", err)
+			log.Fatalf("load env file: %v", err)
 		}
-	}
+	} else if *fromFile != "" {
+		// Load file as base64
+		fileContent, err := os.ReadFile(*fromFile)
+		if err != nil {
+			log.Fatalf("read file: %v", err)
+		}
+		base64Content := base64.StdEncoding.EncodeToString(fileContent)
+		
+		if useEncryption {
+			ciphertext, err := transitEncrypt(client, *transitMount, *keyName, []byte(base64Content))
+			if err != nil {
+				log.Fatalf("transit encrypt: %v", err)
+			}
+			data = map[string]interface{}{"ciphertext": ciphertext}
+		} else {
+			data = map[string]interface{}{"value": base64Content}
+		}
+	} else {
+		// Single value (from --value or stdin)
+		var secretValue []byte
+		
+		if *value != "" {
+			secretValue = []byte(*value)
+		} else {
+			// Read from stdin
+			secretValue, err = io.ReadAll(os.Stdin)
+			if err != nil {
+				log.Fatalf("read stdin: %v", err)
+			}
+			// Remove trailing newline if reading from stdin
+			if len(secretValue) > 0 && secretValue[len(secretValue)-1] == '\n' {
+				secretValue = secretValue[:len(secretValue)-1]
+			}
+		}
 
-	if len(secretValue) == 0 {
-		log.Fatal("no secret value provided")
-	}
+		if len(secretValue) == 0 {
+			log.Fatal("no secret value provided")
+		}
 
-	// Remove trailing newline if reading from stdin
-	if *value == "" && len(secretValue) > 0 && secretValue[len(secretValue)-1] == '\n' {
-		secretValue = secretValue[:len(secretValue)-1]
-	}
-
-	// Encrypt with Transit
-	ciphertext, err := transitEncrypt(client, *transitMount, *keyName, secretValue)
-	if err != nil {
-		log.Fatalf("transit encrypt: %v", err)
-	}
-
-	// Store in KV
-	data := map[string]interface{}{
-		"ciphertext": ciphertext,
-		"created_at": time.Now().UTC().Format(time.RFC3339),
+		if useEncryption {
+			ciphertext, err := transitEncrypt(client, *transitMount, *keyName, secretValue)
+			if err != nil {
+				log.Fatalf("transit encrypt: %v", err)
+			}
+			data = map[string]interface{}{"ciphertext": ciphertext}
+		} else {
+			data = map[string]interface{}{"value": string(secretValue)}
+		}
 	}
 
 	if err := kvv2Put(client, *kvMount, *kvPath, data); err != nil {
 		log.Fatalf("kv put: %v", err)
 	}
 
-	fmt.Printf("Secret stored: %s/%s\n", *kvMount, *kvPath)
+	encryptionStatus := "plaintext"
+	if useEncryption {
+		encryptionStatus = "encrypted"
+	}
+	secretsCount := len(data)
+	fmt.Printf("Stored %d secret(s) as %s: %s/%s\n", secretsCount, encryptionStatus, *kvMount, *kvPath)
 }
 
 // --------------- Subcommand: get ---------------
@@ -185,12 +248,14 @@ func cmdGet(args []string) {
 	kvMount := fs.String("kv-mount", "kv", "KV v2 mount path")
 	kvPath := fs.String("path", "", "KV path to retrieve secret")
 	transitMount := fs.String("transit-mount", "transit", "Transit mount path")
-	keyName := fs.String("key", "", "Transit key name")
+	keyName := fs.String("key", "", "Transit key name (required for encrypted secrets)")
+	subKey := fs.String("subkey", "", "Specific subkey to retrieve (for multi-value secrets)")
+	outputJson := fs.Bool("json", false, "Output as JSON format")
 	fs.Parse(args)
 
-	if *kvPath == "" || *keyName == "" {
+	if *kvPath == "" {
 		fs.Usage()
-		log.Fatal("--path and --key are required")
+		log.Fatal("--path is required")
 	}
 
 	client := mustVaultClientFromEnv()
@@ -201,18 +266,92 @@ func cmdGet(args []string) {
 		log.Fatalf("kv get: %v", err)
 	}
 
-	ciphertext, ok := data["ciphertext"].(string)
-	if !ok || ciphertext == "" {
-		log.Fatalf("no ciphertext found at %s/%s", *kvMount, *kvPath)
+	// Check if this is encrypted multi-value data (all values start with "vault:v")
+	isEncryptedMultiValue := false
+	for _, v := range data {
+		if str, ok := v.(string); ok && strings.HasPrefix(str, "vault:v") {
+			isEncryptedMultiValue = true
+			break
+		}
 	}
 
-	// Decrypt with Transit
-	plaintext, err := transitDecrypt(client, *transitMount, *keyName, ciphertext)
-	if err != nil {
-		log.Fatalf("transit decrypt: %v", err)
+	// Try to get single encrypted data first
+	ciphertext, hasCiphertext := data["ciphertext"].(string)
+	if hasCiphertext && ciphertext != "" {
+		// Single encrypted data - requires key
+		if *keyName == "" {
+			log.Fatal("--key is required for encrypted secrets")
+		}
+		plaintext, err := transitDecrypt(client, *transitMount, *keyName, ciphertext)
+		if err != nil {
+			log.Fatalf("transit decrypt: %v", err)
+		}
+		fmt.Print(string(plaintext))
+		return
 	}
 
-	fmt.Print(string(plaintext))
+	// Handle encrypted multi-value data
+	if isEncryptedMultiValue {
+		if *keyName == "" {
+			log.Fatal("--key is required for encrypted secrets")
+		}
+		
+		decryptedData := make(map[string]interface{})
+		for k, v := range data {
+			if ciphertext, ok := v.(string); ok && strings.HasPrefix(ciphertext, "vault:v") {
+				plaintext, err := transitDecrypt(client, *transitMount, *keyName, ciphertext)
+				if err != nil {
+					log.Fatalf("decrypt %s: %v", k, err)
+				}
+				decryptedData[k] = string(plaintext)
+			} else {
+				decryptedData[k] = v
+			}
+		}
+		
+		// Handle output for decrypted multi-value data
+		if *subKey != "" {
+			value, ok := decryptedData[*subKey]
+			if !ok {
+				log.Fatalf("subkey %q not found", *subKey)
+			}
+			fmt.Print(value)
+		} else if *outputJson {
+			outputJSON(decryptedData)
+		} else {
+			// Output as env format
+			for k, v := range decryptedData {
+				fmt.Printf("%s=%v\n", k, v)
+			}
+		}
+		return
+	}
+
+	// Handle plaintext data (single value or multiple values)
+	if *subKey != "" {
+		// Get specific subkey
+		value, ok := data[*subKey]
+		if !ok {
+			log.Fatalf("subkey %q not found", *subKey)
+		}
+		fmt.Print(value)
+	} else if len(data) == 1 {
+		// Single value - print it directly
+		for _, v := range data {
+			fmt.Print(v)
+			break
+		}
+	} else {
+		// Multiple values - output based on format
+		if *outputJson {
+			outputJSON(data)
+		} else {
+			// Output as env format
+			for k, v := range data {
+				fmt.Printf("%s=%v\n", k, v)
+			}
+		}
+	}
 }
 
 // --------------- Subcommand: env ---------------
@@ -535,4 +674,56 @@ func nonEmpty(override, configVal, defaultVal string) string {
 		return configVal
 	}
 	return defaultVal
+}
+
+// loadEnvFile loads a .env file and returns encrypted/plaintext data map
+func loadEnvFile(path string, client *vaultapi.Client, transitMount, keyName string, useEncryption bool) (map[string]interface{}, error) {
+	data := make(map[string]interface{})
+	
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("read file: %w", err)
+	}
+	
+	lines := strings.Split(string(content), "\n")
+	for i, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue // Skip empty lines and comments
+		}
+		
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid format at line %d: %s", i+1, line)
+		}
+		
+		key := strings.TrimSpace(parts[0])
+		value := strings.TrimSpace(parts[1])
+		
+		// Remove quotes if present
+		if len(value) >= 2 && ((value[0] == '"' && value[len(value)-1] == '"') || (value[0] == '\'' && value[len(value)-1] == '\'')) {
+			value = value[1 : len(value)-1]
+		}
+		
+		if useEncryption {
+			ciphertext, err := transitEncrypt(client, transitMount, keyName, []byte(value))
+			if err != nil {
+				return nil, fmt.Errorf("encrypt %s: %w", key, err)
+			}
+			data[key] = ciphertext
+		} else {
+			data[key] = value
+		}
+	}
+	
+	return data, nil
+}
+
+// outputJSON outputs data as JSON format
+func outputJSON(data map[string]interface{}) {
+	jsonData, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		log.Fatalf("marshal json: %v", err)
+	}
+	fmt.Println(string(jsonData))
 }
