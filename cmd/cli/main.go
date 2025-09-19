@@ -11,14 +11,14 @@ import (
 
 func main() {
 	app := &cli.App{
-		Name:  "vault-env",
+		Name:  "vlt",
 		Usage: "Minimal secrets management with Vault (optionally with Transit encryption)",
-		Description: `vault-env is a CLI tool for managing secrets with HashiCorp Vault using optional Transit encryption.
+		Description: `vlt is a CLI tool for managing secrets with HashiCorp Vault using optional Transit encryption.
 It supports storing and retrieving single values or multiple key-value pairs, with smart merging capabilities.`,
 		Version: "2.0.0",
 		Authors: []*cli.Author{
 			{
-				Name: "vault-env contributors",
+				Name: "vlt contributors",
 			},
 		},
 		Commands: vaultcli.GetCommands(),
@@ -102,7 +102,7 @@ It supports storing and retrieving single values or multiple key-value pairs, wi
 			}
 			return nil
 		},
-		UsageText: `vault-env [global options] command [command options] [arguments...]
+		UsageText: `vlt [global options] command [command options] [arguments...]
 
 ENVIRONMENT VARIABLES:
   VAULT_ADDR         Vault server address (required)
@@ -131,67 +131,67 @@ ENVIRONMENT VARIABLES:
 
 EXAMPLES:
   # Token authentication (default)
-  VAULT_ADDR=https://vault.example.com VAULT_TOKEN=hvs.xxx vault-env get --path secrets/app
+  VAULT_ADDR=https://vault.example.com VAULT_TOKEN=hvs.xxx vlt get --path secrets/app
   
   # AppRole authentication (auto-detected)
-  VAULT_ADDR=https://vault.example.com VAULT_ROLE_ID=xxx VAULT_SECRET_ID=yyy vault-env get --path secrets/app
+  VAULT_ADDR=https://vault.example.com VAULT_ROLE_ID=xxx VAULT_SECRET_ID=yyy vlt get --path secrets/app
   
   # GitHub authentication
-  VAULT_ADDR=https://vault.example.com VAULT_GITHUB_TOKEN=ghp_xxx vault-env get --path secrets/app
+  VAULT_ADDR=https://vault.example.com VAULT_GITHUB_TOKEN=ghp_xxx vlt get --path secrets/app
   
   # Kubernetes authentication
-  VAULT_ADDR=https://vault.example.com VAULT_K8S_ROLE=my-role vault-env get --path secrets/app
+  VAULT_ADDR=https://vault.example.com VAULT_K8S_ROLE=my-role vlt get --path secrets/app
   
   # Store a single secret with transit encryption
-  vault-env put --encryption-key mykey --path secrets/db_password --value "supersecret"
+  vlt put --encryption-key mykey --path secrets/db_password --value "supersecret"
   
   # Store using environment variable for encryption key
-  ENCRYPTION_KEY=mykey vault-env put --path secrets/db_password --value "supersecret"
+  ENCRYPTION_KEY=mykey vlt put --path secrets/db_password --value "supersecret"
   
   # Enable transit encryption with defaults (key="app-secrets", mount="transit")
-  TRANSIT=true vault-env put --path secrets/db_password --value "supersecret"
+  TRANSIT=true vlt put --path secrets/db_password --value "supersecret"
   
   # Enable transit encryption with custom key
-  TRANSIT=true ENCRYPTION_KEY=mykey vault-env put --path secrets/db_password --value "supersecret"
+  TRANSIT=true ENCRYPTION_KEY=mykey vlt put --path secrets/db_password --value "supersecret"
   
   # Store without encryption (disable transit even if key is set)
-  TRANSIT=false vault-env put --path secrets/db_password --value "supersecret"
+  TRANSIT=false vlt put --path secrets/db_password --value "supersecret"
   
   # Store multiple secrets from .env file (merges with existing)
-  vault-env put --encryption-key mykey --path secrets/myapp --from-env .env
+  vlt put --encryption-key mykey --path secrets/myapp --from-env .env
   
   # Store file as base64 encoded value
-  vault-env put --encryption-key mykey --path secrets/ssh_key --from-file ~/.ssh/id_rsa
+  vlt put --encryption-key mykey --path secrets/ssh_key --from-file ~/.ssh/id_rsa
   
   # Update specific key in existing multi-value secret
-  vault-env put --encryption-key mykey --path secrets/myapp --key API_KEY --value "new-api-key"
+  vlt put --encryption-key mykey --path secrets/myapp --key API_KEY --value "new-api-key"
   
   # Retrieve a secret
-  vault-env get --encryption-key mykey --path secrets/db_password
+  vlt get --encryption-key mykey --path secrets/db_password
   
   # Retrieve specific key from multi-value secret
-  vault-env get --encryption-key mykey --path secrets/myapp --key API_KEY
+  vlt get --encryption-key mykey --path secrets/myapp --key API_KEY
   
   # Get all secrets from config file (.env format)
-  vault-env get --config secrets.yaml
+  vlt get --config secrets.yaml
   
   # Get all secrets from config file (JSON format)
-  vault-env get --config secrets.yaml --json
+  vlt get --config secrets.yaml --json
   
   # Sync from config file
-  vault-env sync --config secrets.yaml
+  vlt sync --config secrets.yaml
   
   # Run command with secrets injected
-  vault-env run --config secrets.yaml -- go run main.go
+  vlt run --config secrets.yaml -- go run main.go
   
   # Convert .env file to JSON with encryption (uses defaults)
-  TRANSIT=true vault-env json
+  TRANSIT=true vlt json
   
   # Convert .env file to plaintext JSON
-  vault-env json example.env
+  vlt json example.env
   
   # Generate shell completion
-  vault-env completion fish > ~/.config/fish/completions/vault-env.fish`,
+  vlt completion fish > ~/.config/fish/completions/vlt.fish`,
 	}
 
 	if err := app.Run(os.Args); err != nil {

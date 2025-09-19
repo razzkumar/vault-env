@@ -1,6 +1,6 @@
-# Makefile for vault-env
+# Makefile for vlt
 
-BINARY_NAME=vault-env
+BINARY_NAME=vlt
 BINARY_PATH=./$(BINARY_NAME)
 MAIN_PATH=./cmd/cli
 
@@ -51,31 +51,31 @@ build-all:
 
 # Install shell completions
 completion-bash: build
-	./$(BINARY_NAME) completion bash > /tmp/vault-env-bash-completion
-	@echo "Bash completion generated at /tmp/vault-env-bash-completion"
-	@echo "Install with: sudo cp /tmp/vault-env-bash-completion /etc/bash_completion.d/vault-env"
+	./$(BINARY_NAME) completion bash > /tmp/vlt-bash-completion
+	@echo "Bash completion generated at /tmp/vlt-bash-completion"
+	@echo "Install with: sudo cp /tmp/vlt-bash-completion /etc/bash_completion.d/vlt"
 
 completion-zsh: build
-	./$(BINARY_NAME) completion zsh > /tmp/_vault-env-zsh-completion
-	@echo "Zsh completion generated at /tmp/_vault-env-zsh-completion"
-	@echo "Install with: sudo cp /tmp/_vault-env-zsh-completion /usr/local/share/zsh/site-functions/_vault-env"
+	./$(BINARY_NAME) completion zsh > /tmp/_vlt-zsh-completion
+	@echo "Zsh completion generated at /tmp/_vlt-zsh-completion"
+	@echo "Install with: sudo cp /tmp/_vlt-zsh-completion /usr/local/share/zsh/site-functions/_vlt"
 
 completion-fish: build
-	./$(BINARY_NAME) completion fish > /tmp/vault-env.fish
-	@echo "Fish completion generated at /tmp/vault-env.fish"
-	@echo "Install with: cp /tmp/vault-env.fish ~/.config/fish/completions/"
+	./$(BINARY_NAME) completion fish > /tmp/vlt.fish
+	@echo "Fish completion generated at /tmp/vlt.fish"
+	@echo "Install with: cp /tmp/vlt.fish ~/.config/fish/completions/"
 
 completion-powershell: build
-	./$(BINARY_NAME) completion powershell > /tmp/vault-env-completion.ps1
-	@echo "PowerShell completion generated at /tmp/vault-env-completion.ps1"
+	./$(BINARY_NAME) completion powershell > /tmp/vlt-completion.ps1
+	@echo "PowerShell completion generated at /tmp/vlt-completion.ps1"
 	@echo "Install by sourcing in your PowerShell profile"
 
 # Install completion for current user's fish shell (if fish is available)
 install-completion: build
 	@if command -v fish > /dev/null 2>&1; then \
 		mkdir -p ~/.config/fish/completions; \
-		./$(BINARY_NAME) completion fish > ~/.config/fish/completions/vault-env.fish; \
-		echo "Fish completion installed to ~/.config/fish/completions/vault-env.fish"; \
+		./$(BINARY_NAME) completion fish > ~/.config/fish/completions/vlt.fish; \
+		echo "Fish completion installed to ~/.config/fish/completions/vlt.fish"; \
 	else \
 		echo "Fish shell not found. Use 'make completion-[bash|zsh|fish|powershell]' to generate completions."; \
 	fi

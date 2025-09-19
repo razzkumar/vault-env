@@ -365,25 +365,25 @@ Defaults when TRANSIT=true:
 
 Examples:
   # Output plaintext JSON (default behavior)
-  vault-env json
+  vlt json
   
   # Output plaintext JSON from specific file
-  vault-env json example.env
+  vlt json example.env
   
   # Enable encryption with defaults (key="app-secrets", mount="transit")
-  TRANSIT=true vault-env json
+  TRANSIT=true vlt json
   
   # Enable encryption with custom key
-  TRANSIT=true ENCRYPTION_KEY=mykey vault-env json
+  TRANSIT=true ENCRYPTION_KEY=mykey vlt json
   
   # Enable encryption with command flag
-  vault-env json --encryption-key mykey
+  vlt json --encryption-key mykey
   
   # Disable encryption even if encryption key is set
-  TRANSIT=false ENCRYPTION_KEY=mykey vault-env json
+  TRANSIT=false ENCRYPTION_KEY=mykey vlt json
   
   # Use custom transit mount
-  TRANSIT=true TRANSIT_MOUNT=custom-transit vault-env json example.env`,
+  TRANSIT=true TRANSIT_MOUNT=custom-transit vlt json example.env`,
 		ArgsUsage: "[env-file]",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
@@ -503,8 +503,8 @@ PowerShell:
 
 // Completion generation functions
 func generateBashCompletion(ctx *cli.Context) error {
-	_, err := fmt.Print(`# vault-env bash completion
-_vault_env_completion() {
+	_, err := fmt.Print(`# vlt bash completion
+_vlt_completion() {
     local cur prev opts
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
@@ -554,20 +554,20 @@ _vault_env_completion() {
     COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
 }
 
-complete -F _vault_env_completion vault-env
+complete -F _vlt_completion vlt
 `)
 	return err
 }
 
 func generateZshCompletion(ctx *cli.Context) error {
-	_, err := fmt.Print(`#compdef vault-env
+	_, err := fmt.Print(`#compdef vlt
 
-_vault_env() {
+_vlt() {
     local context curcontext state line
     typeset -A opt_args
     
     _arguments -C \
-        '1: :_vault_env_commands' \
+        '1: :_vlt_commands' \
         '*:: :->args'
     
     case $state in
@@ -629,7 +629,7 @@ _vault_env() {
     esac
 }
 
-_vault_env_commands() {
+_vlt_commands() {
     local -a commands
     commands=(
         'put:Store/update secrets in Vault'
@@ -643,89 +643,89 @@ _vault_env_commands() {
     _describe 'commands' commands
 }
 
-_vault_env
+_vlt
 `)
 	return err
 }
 
 func generateFishCompletion(ctx *cli.Context) error {
-	_, err := fmt.Print(`# vault-env fish completion
+	_, err := fmt.Print(`# vlt fish completion
 
 # Commands
-complete -c vault-env -f -n '__fish_use_subcommand' -a 'put' -d 'Store/update secrets in Vault'
-complete -c vault-env -f -n '__fish_use_subcommand' -a 'get' -d 'Retrieve and decrypt secrets from Vault'
-complete -c vault-env -f -n '__fish_use_subcommand' -a 'sync' -d 'Sync secrets from YAML config to .env file'
-complete -c vault-env -f -n '__fish_use_subcommand' -a 'run' -d 'Run command with secrets injected as environment variables'
-complete -c vault-env -f -n '__fish_use_subcommand' -a 'json' -d 'Encrypt .env file content and output as JSON'
-complete -c vault-env -f -n '__fish_use_subcommand' -a 'completion' -d 'Generate shell completion scripts'
-complete -c vault-env -f -n '__fish_use_subcommand' -a 'help' -d 'Show help'
+complete -c vlt -f -n '__fish_use_subcommand' -a 'put' -d 'Store/update secrets in Vault'
+complete -c vlt -f -n '__fish_use_subcommand' -a 'get' -d 'Retrieve and decrypt secrets from Vault'
+complete -c vlt -f -n '__fish_use_subcommand' -a 'sync' -d 'Sync secrets from YAML config to .env file'
+complete -c vlt -f -n '__fish_use_subcommand' -a 'run' -d 'Run command with secrets injected as environment variables'
+complete -c vlt -f -n '__fish_use_subcommand' -a 'json' -d 'Encrypt .env file content and output as JSON'
+complete -c vlt -f -n '__fish_use_subcommand' -a 'completion' -d 'Generate shell completion scripts'
+complete -c vlt -f -n '__fish_use_subcommand' -a 'help' -d 'Show help'
 
 # Aliases
-complete -c vault-env -f -n '__fish_use_subcommand' -a 'p' -d 'Store/update secrets in Vault (alias)'
-complete -c vault-env -f -n '__fish_use_subcommand' -a 'g' -d 'Retrieve and decrypt secrets from Vault (alias)'
-complete -c vault-env -f -n '__fish_use_subcommand' -a 's' -d 'Sync secrets from YAML config to .env file (alias)'
-complete -c vault-env -f -n '__fish_use_subcommand' -a 'r' -d 'Run command with secrets injected as environment variables (alias)'
-complete -c vault-env -f -n '__fish_use_subcommand' -a 'j' -d 'Encrypt .env file content and output as JSON (alias)'
-complete -c vault-env -f -n '__fish_use_subcommand' -a 'comp' -d 'Generate shell completion scripts (alias)'
+complete -c vlt -f -n '__fish_use_subcommand' -a 'p' -d 'Store/update secrets in Vault (alias)'
+complete -c vlt -f -n '__fish_use_subcommand' -a 'g' -d 'Retrieve and decrypt secrets from Vault (alias)'
+complete -c vlt -f -n '__fish_use_subcommand' -a 's' -d 'Sync secrets from YAML config to .env file (alias)'
+complete -c vlt -f -n '__fish_use_subcommand' -a 'r' -d 'Run command with secrets injected as environment variables (alias)'
+complete -c vlt -f -n '__fish_use_subcommand' -a 'j' -d 'Encrypt .env file content and output as JSON (alias)'
+complete -c vlt -f -n '__fish_use_subcommand' -a 'comp' -d 'Generate shell completion scripts (alias)'
 
 # Put command options
-complete -c vault-env -f -n '__fish_seen_subcommand_from put p' -l 'path' -d 'KV path to store secret(s)'
-complete -c vault-env -f -n '__fish_seen_subcommand_from put p' -l 'encryption-key' -d 'Transit encryption key name'
-complete -c vault-env -f -n '__fish_seen_subcommand_from put p' -l 'key' -d 'Specific key to update in multi-value secret'
-complete -c vault-env -f -n '__fish_seen_subcommand_from put p' -l 'value' -d 'Secret value'
-complete -c vault-env -f -n '__fish_seen_subcommand_from put p' -l 'from-env' -d 'Load multiple key-value pairs from .env file'
-complete -c vault-env -f -n '__fish_seen_subcommand_from put p' -l 'from-file' -d 'Load file content as base64 encoded value'
-complete -c vault-env -f -n '__fish_seen_subcommand_from put p' -l 'kv-mount' -d 'KV v2 mount path'
-complete -c vault-env -f -n '__fish_seen_subcommand_from put p' -l 'transit-mount' -d 'Transit mount path'
+complete -c vlt -f -n '__fish_seen_subcommand_from put p' -l 'path' -d 'KV path to store secret(s)'
+complete -c vlt -f -n '__fish_seen_subcommand_from put p' -l 'encryption-key' -d 'Transit encryption key name'
+complete -c vlt -f -n '__fish_seen_subcommand_from put p' -l 'key' -d 'Specific key to update in multi-value secret'
+complete -c vlt -f -n '__fish_seen_subcommand_from put p' -l 'value' -d 'Secret value'
+complete -c vlt -f -n '__fish_seen_subcommand_from put p' -l 'from-env' -d 'Load multiple key-value pairs from .env file'
+complete -c vlt -f -n '__fish_seen_subcommand_from put p' -l 'from-file' -d 'Load file content as base64 encoded value'
+complete -c vlt -f -n '__fish_seen_subcommand_from put p' -l 'kv-mount' -d 'KV v2 mount path'
+complete -c vlt -f -n '__fish_seen_subcommand_from put p' -l 'transit-mount' -d 'Transit mount path'
 
 # Get command options
-complete -c vault-env -f -n '__fish_seen_subcommand_from get g' -l 'path' -d 'KV path to retrieve secret'
-complete -c vault-env -f -n '__fish_seen_subcommand_from get g' -l 'config' -d 'YAML config file with secret definitions'
-complete -c vault-env -f -n '__fish_seen_subcommand_from get g' -l 'encryption-key' -d 'Transit encryption key name'
-complete -c vault-env -f -n '__fish_seen_subcommand_from get g' -l 'key' -d 'Specific key to retrieve'
-complete -c vault-env -f -n '__fish_seen_subcommand_from get g' -l 'json' -d 'Output as JSON format'
-complete -c vault-env -f -n '__fish_seen_subcommand_from get g' -l 'kv-mount' -d 'KV v2 mount path'
-complete -c vault-env -f -n '__fish_seen_subcommand_from get g' -l 'transit-mount' -d 'Transit mount path'
+complete -c vlt -f -n '__fish_seen_subcommand_from get g' -l 'path' -d 'KV path to retrieve secret'
+complete -c vlt -f -n '__fish_seen_subcommand_from get g' -l 'config' -d 'YAML config file with secret definitions'
+complete -c vlt -f -n '__fish_seen_subcommand_from get g' -l 'encryption-key' -d 'Transit encryption key name'
+complete -c vlt -f -n '__fish_seen_subcommand_from get g' -l 'key' -d 'Specific key to retrieve'
+complete -c vlt -f -n '__fish_seen_subcommand_from get g' -l 'json' -d 'Output as JSON format'
+complete -c vlt -f -n '__fish_seen_subcommand_from get g' -l 'kv-mount' -d 'KV v2 mount path'
+complete -c vlt -f -n '__fish_seen_subcommand_from get g' -l 'transit-mount' -d 'Transit mount path'
 
 # Sync command options
-complete -c vault-env -f -n '__fish_seen_subcommand_from sync s' -l 'config' -d 'YAML config file'
-complete -c vault-env -f -n '__fish_seen_subcommand_from sync s' -l 'output' -d 'Output .env file'
+complete -c vlt -f -n '__fish_seen_subcommand_from sync s' -l 'config' -d 'YAML config file'
+complete -c vlt -f -n '__fish_seen_subcommand_from sync s' -l 'output' -d 'Output .env file'
 
 # Run command options
-complete -c vault-env -f -n '__fish_seen_subcommand_from run r' -l 'config' -d 'YAML config file with secret definitions'
-complete -c vault-env -f -n '__fish_seen_subcommand_from run r' -l 'encryption-key' -d 'Transit encryption key name'
-complete -c vault-env -f -n '__fish_seen_subcommand_from run r' -l 'inject' -d 'Inject specific secret as ENV_VAR=vault_path'
-complete -c vault-env -f -n '__fish_seen_subcommand_from run r' -l 'env-file' -d 'Load additional environment variables from .env file'
-complete -c vault-env -f -n '__fish_seen_subcommand_from run r' -l 'kv-mount' -d 'KV v2 mount path'
-complete -c vault-env -f -n '__fish_seen_subcommand_from run r' -l 'transit-mount' -d 'Transit mount path'
-complete -c vault-env -f -n '__fish_seen_subcommand_from run r' -l 'dry-run' -d 'Show environment variables without running command'
-complete -c vault-env -f -n '__fish_seen_subcommand_from run r' -l 'preserve-env' -d 'Preserve all current environment variables'
+complete -c vlt -f -n '__fish_seen_subcommand_from run r' -l 'config' -d 'YAML config file with secret definitions'
+complete -c vlt -f -n '__fish_seen_subcommand_from run r' -l 'encryption-key' -d 'Transit encryption key name'
+complete -c vlt -f -n '__fish_seen_subcommand_from run r' -l 'inject' -d 'Inject specific secret as ENV_VAR=vault_path'
+complete -c vlt -f -n '__fish_seen_subcommand_from run r' -l 'env-file' -d 'Load additional environment variables from .env file'
+complete -c vlt -f -n '__fish_seen_subcommand_from run r' -l 'kv-mount' -d 'KV v2 mount path'
+complete -c vlt -f -n '__fish_seen_subcommand_from run r' -l 'transit-mount' -d 'Transit mount path'
+complete -c vlt -f -n '__fish_seen_subcommand_from run r' -l 'dry-run' -d 'Show environment variables without running command'
+complete -c vlt -f -n '__fish_seen_subcommand_from run r' -l 'preserve-env' -d 'Preserve all current environment variables'
 
 # JSON command options
-complete -c vault-env -f -n '__fish_seen_subcommand_from json j' -l 'encryption-key' -d 'Transit encryption key name'
-complete -c vault-env -f -n '__fish_seen_subcommand_from json j' -l 'transit-mount' -d 'Transit mount path'
+complete -c vlt -f -n '__fish_seen_subcommand_from json j' -l 'encryption-key' -d 'Transit encryption key name'
+complete -c vlt -f -n '__fish_seen_subcommand_from json j' -l 'transit-mount' -d 'Transit mount path'
 
 # Completion command options
-complete -c vault-env -f -n '__fish_seen_subcommand_from completion comp' -a 'bash' -d 'Generate bash completion'
-complete -c vault-env -f -n '__fish_seen_subcommand_from completion comp' -a 'zsh' -d 'Generate zsh completion'
-complete -c vault-env -f -n '__fish_seen_subcommand_from completion comp' -a 'fish' -d 'Generate fish completion'
-complete -c vault-env -f -n '__fish_seen_subcommand_from completion comp' -a 'powershell' -d 'Generate PowerShell completion'
+complete -c vlt -f -n '__fish_seen_subcommand_from completion comp' -a 'bash' -d 'Generate bash completion'
+complete -c vlt -f -n '__fish_seen_subcommand_from completion comp' -a 'zsh' -d 'Generate zsh completion'
+complete -c vlt -f -n '__fish_seen_subcommand_from completion comp' -a 'fish' -d 'Generate fish completion'
+complete -c vlt -f -n '__fish_seen_subcommand_from completion comp' -a 'powershell' -d 'Generate PowerShell completion'
 
 # Global options
-complete -c vault-env -f -l 'vault-addr' -d 'Vault server address'
-complete -c vault-env -f -l 'vault-token' -d 'Vault authentication token'
-complete -c vault-env -f -l 'vault-namespace' -d 'Vault namespace'
-complete -c vault-env -f -l 'encryption-key' -d 'Default transit encryption key'
-complete -c vault-env -f -l 'help' -d 'Show help'
-complete -c vault-env -f -l 'version' -d 'Print version'
+complete -c vlt -f -l 'vault-addr' -d 'Vault server address'
+complete -c vlt -f -l 'vault-token' -d 'Vault authentication token'
+complete -c vlt -f -l 'vault-namespace' -d 'Vault namespace'
+complete -c vlt -f -l 'encryption-key' -d 'Default transit encryption key'
+complete -c vlt -f -l 'help' -d 'Show help'
+complete -c vlt -f -l 'version' -d 'Print version'
 `)
 	return err
 }
 
 func generatePowerShellCompletion(ctx *cli.Context) error {
-	_, err := fmt.Print(`# vault-env PowerShell completion
+	_, err := fmt.Print(`# vlt PowerShell completion
 
-Register-ArgumentCompleter -Native -CommandName vault-env -ScriptBlock {
+Register-ArgumentCompleter -Native -CommandName vlt -ScriptBlock {
     param($commandName, $wordToComplete, $cursorPosition)
     
     $commands = @('put', 'get', 'sync', 'run', 'json', 'completion', 'help')
