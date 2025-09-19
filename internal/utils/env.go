@@ -11,6 +11,22 @@ import (
 	"github.com/razzkumar/vault-env/pkg/vault"
 )
 
+// LoadEnvFileAsPlaintext loads a .env file and returns plaintext data map (no vault client needed)
+func LoadEnvFileAsPlaintext(path string) (map[string]interface{}, error) {
+	// Use godotenv to parse the .env file
+	envMap, err := godotenv.Read(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read .env file: %w", err)
+	}
+
+	data := make(map[string]interface{})
+	for key, value := range envMap {
+		data[key] = value
+	}
+
+	return data, nil
+}
+
 // LoadEnvFile loads a .env file and returns encrypted/plaintext data map
 func LoadEnvFile(path string, client *vault.Client, transitMount, keyName string, useEncryption bool) (map[string]interface{}, error) {
 	// Use godotenv to parse the .env file

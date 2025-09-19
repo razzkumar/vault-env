@@ -7,6 +7,8 @@ import (
 	"github.com/urfave/cli/v2"
 
 	"github.com/razzkumar/vault-env/internal/app"
+	"github.com/razzkumar/vault-env/internal/utils"
+	"github.com/razzkumar/vault-env/pkg/config"
 )
 
 // GetCommands returns all CLI commands
@@ -16,6 +18,7 @@ func GetCommands() []*cli.Command {
 		getGetCommand(),
 		getSyncCommand(),
 		getRunCommand(),
+		getJSONCommand(),
 		getCompletionCommand(),
 	}
 }
@@ -27,8 +30,8 @@ func getPutCommand() *cli.Command {
 		Aliases: []string{"p"},
 		Flags: []cli.Flag{
 			&cli.StringFlag{
-				Name:    "path",
-				Usage:   "KV path to store secret(s)",
+				Name:     "path",
+				Usage:    "KV path to store secret(s)",
 				Required: true,
 			},
 			&cli.StringFlag{
@@ -90,14 +93,14 @@ func getPutCommand() *cli.Command {
 			}
 
 			opts := &app.PutOptions{
-				KVMount:      ctx.String("kv-mount"),
-				KVPath:       ctx.String("path"),
-				TransitMount: ctx.String("transit-mount"),
+				KVMount:       ctx.String("kv-mount"),
+				KVPath:        ctx.String("path"),
+				TransitMount:  ctx.String("transit-mount"),
 				EncryptionKey: ctx.String("encryption-key"),
-				Key:          ctx.String("key"),
-				Value:        ctx.String("value"),
-				FromEnv:      ctx.String("from-env"),
-				FromFile:     ctx.String("from-file"),
+				Key:           ctx.String("key"),
+				Value:         ctx.String("value"),
+				FromEnv:       ctx.String("from-env"),
+				FromFile:      ctx.String("from-file"),
 			}
 
 			return appInstance.Put(opts)
@@ -160,14 +163,14 @@ Examples:
 			// Check for default config file if neither path nor config specified
 			configFile := ctx.String("config")
 			kvPath := ctx.String("path")
-			
+
 			if configFile == "" && kvPath == "" {
 				// Check if vault-env.yaml exists in current directory
 				if _, err := os.Stat("vault-env.yaml"); err == nil {
 					configFile = "vault-env.yaml"
 				}
 			}
-			
+
 			// Validate that we have either path or config
 			if kvPath == "" && configFile == "" {
 				return fmt.Errorf("either --path, --config, or vault-env.yaml file must be specified")
@@ -177,7 +180,7 @@ Examples:
 			if err != nil {
 				return fmt.Errorf("failed to create app: %w", err)
 			}
-			
+
 			if configFile != "" {
 				// Use config file to get all secrets
 				return appInstance.GetFromConfig(configFile, ctx.String("encryption-key"), ctx.Bool("json"))
@@ -301,14 +304,14 @@ If vault-env.yaml exists in the current directory, it will be used automatically
 			// Check for default config file if none specified and no inject flags provided
 			configFile := ctx.String("config")
 			injectSecrets := ctx.StringSlice("inject")
-			
+
 			if configFile == "" && len(injectSecrets) == 0 {
 				// Check if vault-env.yaml exists in current directory only if no inject flags
 				if _, err := os.Stat("vault-env.yaml"); err == nil {
 					configFile = "vault-env.yaml"
 				}
 			}
-			
+
 			// Validate that we have either config or inject flags
 			if configFile == "" && len(injectSecrets) == 0 {
 				return fmt.Errorf("either --config, vault-env.yaml file, or --inject must be specified")
@@ -343,6 +346,93 @@ If vault-env.yaml exists in the current directory, it will be used automatically
 	}
 }
 
+func getJSONCommand() *cli.Command {
+	return &cli.Command{
+		Name:    "json",
+		Usage:   "Encrypt .env file content and output as JSON",
+		Aliases: []string{"j"},
+		Description: `Encrypts environment variables from a .env file using Vault Transit encryption and outputs the result as JSON.
+
+This command is useful for converting .env files to encrypted JSON format that can be stored in Vault or other secure storage systems.
+
+Examples:
+  # Encrypt default .env file
+  vault-env json
+  
+  # Encrypt specific file
+  vault-env json example.env
+  
+  # Encrypt with specific transit key
+  vault-env json --encryption-key mykey
+  
+  # Output plaintext JSON (no encryption)
+  vault-env json --encryption-key=""`,
+		ArgsUsage: "[env-file]",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:  "encryption-key",
+				Usage: "Transit encryption key name (optional - if not provided, outputs plaintext)",
+			},
+			&cli.StringFlag{
+				Name:  "transit-mount",
+				Usage: "Transit mount path",
+				Value: "transit",
+			},
+		},
+		Action: func(ctx *cli.Context) error {
+			// Get env file from args or default to .env
+			envFile := ctx.Args().First()
+			if envFile == "" {
+				envFile = ".env"
+			}
+
+			// Check if encryption is needed
+			encryptionKey := config.GetEncryptionKey(ctx.String("encryption-key"))
+			useEncryption := encryptionKey != ""
+
+			if !useEncryption {
+				// For plaintext output, don't need vault client
+				return handlePlaintextJSON(envFile)
+			}
+
+			// For encryption, create app with vault client
+			appInstance, err := app.New()
+			if err != nil {
+				return fmt.Errorf("failed to create app: %w", err)
+			}
+
+			opts := &app.JSONOptions{
+				TransitMount:  ctx.String("transit-mount"),
+				EncryptionKey: ctx.String("encryption-key"),
+				EnvFile:       envFile,
+			}
+
+			return appInstance.JSON(opts)
+		},
+	}
+}
+
+// handlePlaintextJSON handles JSON output without encryption (no vault client needed)
+func handlePlaintextJSON(envFile string) error {
+	// Check if file exists
+	if _, err := os.Stat(envFile); os.IsNotExist(err) {
+		return fmt.Errorf("env file not found: %s", envFile)
+	}
+
+	// Load as plaintext
+	data, err := utils.LoadEnvFileAsPlaintext(envFile)
+	if err != nil {
+		return fmt.Errorf("load env file: %w", err)
+	}
+
+	// Output as JSON
+	if err := utils.OutputJSON(data); err != nil {
+		return fmt.Errorf("output json: %w", err)
+	}
+
+	return nil
+}
+
 func getCompletionCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "completion",
@@ -369,7 +459,7 @@ Fish:
 PowerShell:
   vault-env completion powershell > vault-env.ps1
   # Then source it in your PowerShell profile`,
-		Aliases: []string{"comp"},
+		Aliases:   []string{"comp"},
 		ArgsUsage: "[shell]",
 		Action: func(ctx *cli.Context) error {
 			shell := ctx.Args().First()
@@ -405,7 +495,7 @@ _vault_env_completion() {
     
     # Complete commands
     if [[ ${COMP_CWORD} -eq 1 ]]; then
-        opts="put get sync run completion help"
+        opts="put get sync run json completion help"
         COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
         return 0
     fi
@@ -423,6 +513,9 @@ _vault_env_completion() {
             ;;
         run|r)
             opts="--config --encryption-key --inject --env-file --kv-mount --transit-mount --dry-run --preserve-env --help"
+            ;;
+        json|j)
+            opts="--encryption-key --transit-mount --help"
             ;;
         completion|comp)
             if [[ ${COMP_CWORD} -eq 2 ]]; then
@@ -504,6 +597,13 @@ _vault_env() {
                         '--preserve-env[Preserve current environment]' \
                         '--help[Show help]'
                     ;;
+                json|j)
+                    _arguments \
+                        '--encryption-key=[Transit encryption key name]:key:' \
+                        '--transit-mount=[Transit mount path]:mount:' \
+                        '--help[Show help]' \
+                        '1: :_files'
+                    ;;
                 completion|comp)
                     _arguments '1: :(bash zsh fish powershell)'
                     ;;
@@ -519,6 +619,7 @@ _vault_env_commands() {
         'get:Retrieve and decrypt secrets from Vault'
         'sync:Sync secrets from YAML config to .env file'
         'run:Run command with secrets injected as environment variables'
+        'json:Encrypt .env file content and output as JSON'
         'completion:Generate shell completion scripts'
         'help:Show help'
     )
@@ -538,6 +639,7 @@ complete -c vault-env -f -n '__fish_use_subcommand' -a 'put' -d 'Store/update se
 complete -c vault-env -f -n '__fish_use_subcommand' -a 'get' -d 'Retrieve and decrypt secrets from Vault'
 complete -c vault-env -f -n '__fish_use_subcommand' -a 'sync' -d 'Sync secrets from YAML config to .env file'
 complete -c vault-env -f -n '__fish_use_subcommand' -a 'run' -d 'Run command with secrets injected as environment variables'
+complete -c vault-env -f -n '__fish_use_subcommand' -a 'json' -d 'Encrypt .env file content and output as JSON'
 complete -c vault-env -f -n '__fish_use_subcommand' -a 'completion' -d 'Generate shell completion scripts'
 complete -c vault-env -f -n '__fish_use_subcommand' -a 'help' -d 'Show help'
 
@@ -546,6 +648,7 @@ complete -c vault-env -f -n '__fish_use_subcommand' -a 'p' -d 'Store/update secr
 complete -c vault-env -f -n '__fish_use_subcommand' -a 'g' -d 'Retrieve and decrypt secrets from Vault (alias)'
 complete -c vault-env -f -n '__fish_use_subcommand' -a 's' -d 'Sync secrets from YAML config to .env file (alias)'
 complete -c vault-env -f -n '__fish_use_subcommand' -a 'r' -d 'Run command with secrets injected as environment variables (alias)'
+complete -c vault-env -f -n '__fish_use_subcommand' -a 'j' -d 'Encrypt .env file content and output as JSON (alias)'
 complete -c vault-env -f -n '__fish_use_subcommand' -a 'comp' -d 'Generate shell completion scripts (alias)'
 
 # Put command options
@@ -581,6 +684,10 @@ complete -c vault-env -f -n '__fish_seen_subcommand_from run r' -l 'transit-moun
 complete -c vault-env -f -n '__fish_seen_subcommand_from run r' -l 'dry-run' -d 'Show environment variables without running command'
 complete -c vault-env -f -n '__fish_seen_subcommand_from run r' -l 'preserve-env' -d 'Preserve all current environment variables'
 
+# JSON command options
+complete -c vault-env -f -n '__fish_seen_subcommand_from json j' -l 'encryption-key' -d 'Transit encryption key name'
+complete -c vault-env -f -n '__fish_seen_subcommand_from json j' -l 'transit-mount' -d 'Transit mount path'
+
 # Completion command options
 complete -c vault-env -f -n '__fish_seen_subcommand_from completion comp' -a 'bash' -d 'Generate bash completion'
 complete -c vault-env -f -n '__fish_seen_subcommand_from completion comp' -a 'zsh' -d 'Generate zsh completion'
@@ -604,8 +711,8 @@ func generatePowerShellCompletion(ctx *cli.Context) error {
 Register-ArgumentCompleter -Native -CommandName vault-env -ScriptBlock {
     param($commandName, $wordToComplete, $cursorPosition)
     
-    $commands = @('put', 'get', 'sync', 'run', 'completion', 'help')
-    $aliases = @('p', 'g', 's', 'r', 'comp', 'h')
+    $commands = @('put', 'get', 'sync', 'run', 'json', 'completion', 'help')
+    $aliases = @('p', 'g', 's', 'r', 'j', 'comp', 'h')
     
     # Split the command line
     $commandElements = $wordToComplete.Split(' ', [System.StringSplitOptions]::RemoveEmptyEntries)
@@ -628,6 +735,9 @@ Register-ArgumentCompleter -Native -CommandName vault-env -ScriptBlock {
         }
         { $_ -in @('run', 'r') } {
             return @('--config', '--encryption-key', '--inject', '--env-file', '--kv-mount', '--transit-mount', '--dry-run', '--preserve-env', '--help') | Where-Object { $_ -like "$wordToComplete*" }
+        }
+        { $_ -in @('json', 'j') } {
+            return @('--encryption-key', '--transit-mount', '--help') | Where-Object { $_ -like "$wordToComplete*" }
         }
         { $_ -in @('completion', 'comp') } {
             return @('bash', 'zsh', 'fish', 'powershell') | Where-Object { $_ -like "$wordToComplete*" }
