@@ -53,8 +53,8 @@ go list -m all | grep -E "(vault|hcl|cli|godotenv)"
 make build
 
 # Test functionality
-./vault-env --version
-./vault-env --help
+./vlt --version
+./vlt --help
 ```
 
 ### Security Considerations

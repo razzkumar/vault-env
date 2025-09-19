@@ -1,4 +1,4 @@
-# Comprehensive vault-env configuration showing all supported formats
+# Comprehensive vlt configuration showing all supported formats
 kv:
   mount: kv
 

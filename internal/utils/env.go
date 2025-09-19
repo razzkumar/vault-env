@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/joho/godotenv"
-	"github.com/razzkumar/vault-env/pkg/vault"
+	"github.com/razzkumar/vlt/pkg/vault"
 )
 
 // LoadEnvFileAsPlaintext loads a .env file and returns plaintext data map (no vault client needed)

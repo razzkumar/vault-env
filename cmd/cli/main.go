@@ -6,7 +6,7 @@ import (
 
 	"github.com/urfave/cli/v2"
 
-	vaultcli "github.com/razzkumar/vault-env/pkg/cli"
+	vaultcli "github.com/razzkumar/vlt/pkg/cli"
 )
 
 func main() {

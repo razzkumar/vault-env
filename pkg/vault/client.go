@@ -14,7 +14,7 @@ import (
 	vaultapi "github.com/hashicorp/vault/api"
 	// Auth methods implemented directly
 
-	"github.com/razzkumar/vault-env/pkg/config"
+	"github.com/razzkumar/vlt/pkg/config"
 )
 
 // Client wraps the Vault API client with our specific functionality
@@ -57,7 +57,7 @@ func NewClient(cfg *config.VaultConfig) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("authentication failed: %w", err)
 	}
-	
+
 	client.SetToken(token)
 
 	// Configure TLS properly
@@ -177,16 +177,16 @@ func authenticateVault(client *vaultapi.Client, cfg *config.VaultConfig) (string
 			return "", fmt.Errorf("token is required for token auth")
 		}
 		return cfg.Token, nil
-		
+
 	case "approle":
 		return authenticateAppRole(client, cfg)
-		
+
 	case "github":
 		return authenticateGitHub(client, cfg)
-		
+
 	case "kubernetes":
 		return authenticateKubernetes(client, cfg)
-		
+
 	default:
 		return "", fmt.Errorf("unsupported auth method: %s", cfg.AuthMethod)
 	}
@@ -198,10 +198,10 @@ func authenticateAppRole(client *vaultapi.Client, cfg *config.VaultConfig) (stri
 		"role_id":   cfg.RoleID,
 		"secret_id": cfg.SecretID,
 	}
-	
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(cfg.Timeout)*time.Second)
 	defer cancel()
-	
+
 	secret, err := client.Logical().WriteWithContext(ctx, "auth/approle/login", data)
 	if err != nil {
 		return "", fmt.Errorf("unable to login to AppRole auth method: %w", err)
@@ -218,10 +218,10 @@ func authenticateGitHub(client *vaultapi.Client, cfg *config.VaultConfig) (strin
 	data := map[string]interface{}{
 		"token": cfg.GitHubToken,
 	}
-	
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(cfg.Timeout)*time.Second)
 	defer cancel()
-	
+
 	secret, err := client.Logical().WriteWithContext(ctx, "auth/github/login", data)
 	if err != nil {
 		return "", fmt.Errorf("unable to login to GitHub auth method: %w", err)
@@ -246,10 +246,10 @@ func authenticateKubernetes(client *vaultapi.Client, cfg *config.VaultConfig) (s
 		"role": cfg.K8sRole,
 		"jwt":  jwt,
 	}
-	
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(cfg.Timeout)*time.Second)
 	defer cancel()
-	
+
 	path := fmt.Sprintf("auth/%s/login", cfg.K8sAuthPath)
 	secret, err := client.Logical().WriteWithContext(ctx, path, data)
 	if err != nil {

@@ -6,9 +6,9 @@ import (
 
 	"github.com/urfave/cli/v2"
 
-	"github.com/razzkumar/vault-env/internal/app"
-	"github.com/razzkumar/vault-env/internal/utils"
-	"github.com/razzkumar/vault-env/pkg/config"
+	"github.com/razzkumar/vlt/internal/app"
+	"github.com/razzkumar/vlt/internal/utils"
+	"github.com/razzkumar/vlt/pkg/config"
 )
 
 // GetCommands returns all CLI commands
@@ -117,16 +117,16 @@ func getGetCommand() *cli.Command {
 
 Examples:
   # Get secrets from specific path
-  vault-env get --path secrets/prod
+  vlt get --path secrets/prod
   
   # Get all secrets from config file
-  vault-env get --config secrets.yaml
+  vlt get --config secrets.yaml
   
-  # Get secrets from default config file (vault-env.yaml)
-  vault-env get
+  # Get secrets from default config file (vlt.yaml)
+  vlt get
   
   # Output as JSON
-  vault-env get --config secrets.yaml --json`,
+  vlt get --config secrets.yaml --json`,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "path",
@@ -134,7 +134,7 @@ Examples:
 			},
 			&cli.StringFlag{
 				Name:  "config",
-				Usage: "YAML config file with secret definitions (defaults to vault-env.yaml if exists)",
+				Usage: "YAML config file with secret definitions (defaults to vlt.yaml if exists)",
 			},
 			&cli.StringFlag{
 				Name:  "encryption-key",
@@ -165,15 +165,15 @@ Examples:
 			kvPath := ctx.String("path")
 
 			if configFile == "" && kvPath == "" {
-				// Check if vault-env.yaml exists in current directory
-				if _, err := os.Stat("vault-env.yaml"); err == nil {
-					configFile = "vault-env.yaml"
+				// Check if vlt.yaml exists in current directory
+				if _, err := os.Stat("vlt.yaml"); err == nil {
+					configFile = "vlt.yaml"
 				}
 			}
 
 			// Validate that we have either path or config
 			if kvPath == "" && configFile == "" {
-				return fmt.Errorf("either --path, --config, or vault-env.yaml file must be specified")
+				return fmt.Errorf("either --path, --config, or vlt.yaml file must be specified")
 			}
 
 			appInstance, err := app.New()
@@ -209,7 +209,7 @@ func getSyncCommand() *cli.Command {
 			&cli.StringFlag{
 				Name:  "config",
 				Usage: "YAML config file",
-				Value: "vault-env.yaml",
+				Value: "vlt.yaml",
 			},
 			&cli.StringFlag{
 				Name:  "output",
@@ -246,27 +246,27 @@ The command inherits your current environment and adds/overrides with Vault secr
 
 Examples:
   # Run with config file (most common)
-  vault-env run --config secrets.yaml -- go run main.go
+  vlt run --config secrets.yaml -- go run main.go
   
-  # Run with default config file (vault-env.yaml)
-  vault-env run -- go run main.go
+  # Run with default config file (vlt.yaml)
+  vlt run -- go run main.go
   
   # Run with inline secret injection
-  vault-env run --inject DB_PASSWORD=secrets/db_password -- ./myapp
+  vlt run --inject DB_PASSWORD=secrets/db_password -- ./myapp
   
   # Run with multiple secret injections
-  vault-env run --inject DB_PASSWORD=secrets/db_password --inject API_KEY=secrets/api_key -- npm start
+  vlt run --inject DB_PASSWORD=secrets/db_password --inject API_KEY=secrets/api_key -- npm start
   
   # Run with existing .env file plus Vault secrets
-  vault-env run --config secrets.yaml --env-file .env.local -- python app.py
+  vlt run --config secrets.yaml --env-file .env.local -- python app.py
 
-Note: Use -- to separate vault-env flags from the command to run.
-If vault-env.yaml exists in the current directory, it will be used automatically if no --config is specified.`,
+Note: Use -- to separate vlt flags from the command to run.
+If vlt.yaml exists in the current directory, it will be used automatically if no --config is specified.`,
 		ArgsUsage: "[-- command args...]",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "config",
-				Usage: "YAML config file with secret definitions (defaults to vault-env.yaml if exists)",
+				Usage: "YAML config file with secret definitions (defaults to vlt.yaml if exists)",
 			},
 			&cli.StringFlag{
 				Name:  "encryption-key",
@@ -306,21 +306,21 @@ If vault-env.yaml exists in the current directory, it will be used automatically
 			injectSecrets := ctx.StringSlice("inject")
 
 			if configFile == "" && len(injectSecrets) == 0 {
-				// Check if vault-env.yaml exists in current directory only if no inject flags
-				if _, err := os.Stat("vault-env.yaml"); err == nil {
-					configFile = "vault-env.yaml"
+				// Check if vlt.yaml exists in current directory only if no inject flags
+				if _, err := os.Stat("vlt.yaml"); err == nil {
+					configFile = "vlt.yaml"
 				}
 			}
 
 			// Validate that we have either config or inject flags
 			if configFile == "" && len(injectSecrets) == 0 {
-				return fmt.Errorf("either --config, vault-env.yaml file, or --inject must be specified")
+				return fmt.Errorf("either --config, vlt.yaml file, or --inject must be specified")
 			}
 
 			// Get the command to run (everything after --)
 			args := ctx.Args().Slice()
 			if len(args) == 0 {
-				return fmt.Errorf("command to run is required. Use -- to separate vault-env options from the command")
+				return fmt.Errorf("command to run is required. Use -- to separate vlt options from the command")
 			}
 
 			appInstance, err := app.New()
@@ -461,20 +461,20 @@ Supported shells: bash, zsh, fish, powershell
 To install completions:
 
 Bash:
-  vault-env completion bash > /etc/bash_completion.d/vault-env
+  vlt completion bash > /etc/bash_completion.d/vlt
   # Or for user-only:
-  vault-env completion bash > ~/.bash_completion.d/vault-env
+  vlt completion bash > ~/.bash_completion.d/vlt
 
 Zsh:
-  vault-env completion zsh > /usr/local/share/zsh/site-functions/_vault-env
+  vlt completion zsh > /usr/local/share/zsh/site-functions/_vlt
   # Or for user-only:
-  vault-env completion zsh > ~/.zsh/completions/_vault-env
+  vlt completion zsh > ~/.zsh/completions/_vlt
 
 Fish:
-  vault-env completion fish > ~/.config/fish/completions/vault-env.fish
+  vlt completion fish > ~/.config/fish/completions/vlt.fish
 
 PowerShell:
-  vault-env completion powershell > vault-env.ps1
+  vlt completion powershell > vlt.ps1
   # Then source it in your PowerShell profile`,
 		Aliases:   []string{"comp"},
 		ArgsUsage: "[shell]",

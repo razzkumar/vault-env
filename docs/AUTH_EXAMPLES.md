@@ -1,6 +1,6 @@
-# vault-env Authentication Methods
+# vlt Authentication Methods
 
-vault-env supports multiple authentication methods with Vault, with automatic detection based on available credentials.
+vlt supports multiple authentication methods with Vault, with automatic detection based on available credentials.
 
 ## Supported Authentication Methods
 
@@ -11,7 +11,7 @@ The traditional token-based authentication.
 export VAULT_ADDR="https://vault.example.com:8200"
 export VAULT_TOKEN="hvs.xxxxxxxxxxxxx"
 
-vault-env get --path secrets/app
+vlt get --path secrets/app
 ```
 
 ### 2. AppRole Authentication  
@@ -23,11 +23,11 @@ export VAULT_ROLE_ID="00275ac3-734f-49fc-0f46-5e9a76fbf304"
 export VAULT_SECRET_ID="282cb405-42e9-c709-bd9f-030998e3f8e8"
 
 # Auth method is auto-detected
-vault-env get --path secrets/app
+vlt get --path secrets/app
 
 # Or explicitly specify
 export VAULT_AUTH_METHOD="approle"
-vault-env get --path secrets/app
+vlt get --path secrets/app
 ```
 
 ### 3. GitHub Authentication
@@ -37,7 +37,7 @@ Uses GitHub personal access token for authentication.
 export VAULT_ADDR="https://vault.example.com:8200"  
 export VAULT_GITHUB_TOKEN="ghp_xxxxxxxxxxxxx"
 
-vault-env get --path secrets/app
+vlt get --path secrets/app
 ```
 
 ### 4. Kubernetes Authentication
@@ -51,12 +51,12 @@ export VAULT_K8S_ROLE="my-app-role"
 export VAULT_K8S_JWT_PATH="/var/run/secrets/kubernetes.io/serviceaccount/token"
 export VAULT_K8S_AUTH_PATH="kubernetes"
 
-vault-env get --path secrets/app
+vlt get --path secrets/app
 ```
 
 ## Authentication Priority
 
-vault-env automatically detects the authentication method in this priority order:
+vlt automatically detects the authentication method in this priority order:
 
 1. **Token** - if `VAULT_TOKEN` is provided
 2. **AppRole** - if both `VAULT_ROLE_ID` and `VAULT_SECRET_ID` are provided
@@ -70,7 +70,7 @@ You can override auto-detection by setting `VAULT_AUTH_METHOD` explicitly.
 All environment variables can also be set via CLI flags:
 
 ```bash
-vault-env --vault-addr https://vault.example.com:8200 \
+vlt --vault-addr https://vault.example.com:8200 \
           --vault-role-id 00275ac3-734f-49fc-0f46-5e9a76fbf304 \
           --vault-secret-id 282cb405-42e9-c709-bd9f-030998e3f8e8 \
           get --path secrets/app
@@ -83,16 +83,16 @@ vault-env --vault-addr https://vault.example.com:8200 \
 vault auth enable approle
 
 # Create a role  
-vault write auth/approle/role/vault-env-app \
-    token_policies="vault-env-policy" \
+vault write auth/approle/role/vlt-app \
+    token_policies="vlt-policy" \
     token_ttl=1h \
     token_max_ttl=4h
 
 # Get role ID
-vault read auth/approle/role/vault-env-app/role-id
+vault read auth/approle/role/vlt-app/role-id
 
 # Generate secret ID  
-vault write -f auth/approle/role/vault-env-app/secret-id
+vault write -f auth/approle/role/vlt-app/secret-id
 ```
 
 ## Setting up GitHub Auth in Vault
@@ -105,7 +105,7 @@ vault auth enable github
 vault write auth/github/config organization=myorg
 
 # Map GitHub team to policies
-vault write auth/github/map/teams/developers value=vault-env-policy
+vault write auth/github/map/teams/developers value=vlt-policy
 ```
 
 ## Setting up Kubernetes Auth in Vault
@@ -121,9 +121,9 @@ vault write auth/kubernetes/config \
     kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
 
 # Create a role
-vault write auth/kubernetes/role/vault-env-app \
-    bound_service_account_names=vault-env \
+vault write auth/kubernetes/role/vlt-app \
+    bound_service_account_names=vlt \
     bound_service_account_namespaces=default \
-    policies=vault-env-policy \
+    policies=vlt-policy \
     ttl=24h
 ```

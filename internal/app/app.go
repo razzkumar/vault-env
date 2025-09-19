@@ -8,12 +8,12 @@ import (
 	"strings"
 	"syscall"
 
-	"gopkg.in/yaml.v3"
 	"github.com/joho/godotenv"
+	"gopkg.in/yaml.v3"
 
-	"github.com/razzkumar/vault-env/internal/utils"
-	"github.com/razzkumar/vault-env/pkg/config"
-	"github.com/razzkumar/vault-env/pkg/vault"
+	"github.com/razzkumar/vlt/internal/utils"
+	"github.com/razzkumar/vlt/pkg/config"
+	"github.com/razzkumar/vlt/pkg/vault"
 )
 
 // App represents the main application
@@ -36,14 +36,14 @@ func New() (*App, error) {
 
 // PutOptions contains options for the Put operation
 type PutOptions struct {
-	KVMount      string
-	KVPath       string
-	TransitMount string
+	KVMount       string
+	KVPath        string
+	TransitMount  string
 	EncryptionKey string
-	Key          string
-	Value        string
-	FromEnv      string
-	FromFile     string
+	Key           string
+	Value         string
+	FromEnv       string
+	FromFile      string
 }
 
 // Put stores secrets in Vault with optional encryption
@@ -250,19 +250,19 @@ func (a *App) GetFromConfig(configPath, encryptionKey string, outputJSON bool) e
 	}
 
 	effectiveEncryptionKey := config.GetEncryptionKey(encryptionKey)
-	
+
 	// Use the shared logic for loading secrets
 	envVars, err := a.loadSecretsFromConfig(cfg, "kv", "transit", effectiveEncryptionKey)
 	if err != nil {
 		return fmt.Errorf("load secrets from config: %w", err)
 	}
-	
+
 	// Convert to interface map for output functions
 	data := make(map[string]interface{})
 	for k, v := range envVars {
 		data[k] = v
 	}
-	
+
 	// Output in requested format
 	if outputJSON {
 		if err := utils.OutputJSON(data); err != nil {
@@ -271,7 +271,7 @@ func (a *App) GetFromConfig(configPath, encryptionKey string, outputJSON bool) e
 	} else {
 		utils.OutputEnvFormat(data)
 	}
-	
+
 	return nil
 }
 
@@ -307,7 +307,7 @@ type RunOptions struct {
 // Run executes a command with secrets injected as environment variables
 func (a *App) Run(opts *RunOptions) error {
 	effectiveEncryptionKey := config.GetEncryptionKey(opts.EncryptionKey)
-	
+
 	// Start with current environment if preserve-env is true
 	envVars := make(map[string]string)
 	if opts.PreserveEnv {
@@ -318,7 +318,7 @@ func (a *App) Run(opts *RunOptions) error {
 			}
 		}
 	}
-	
+
 	// Load from .env file if specified
 	if opts.EnvFile != "" {
 		fileEnvVars, err := a.loadEnvFileForRun(opts.EnvFile)
@@ -329,14 +329,14 @@ func (a *App) Run(opts *RunOptions) error {
 			envVars[k] = v
 		}
 	}
-	
+
 	// Load from config file if specified
 	if opts.ConfigFile != "" {
 		cfg, err := a.LoadConfig(opts.ConfigFile)
 		if err != nil {
 			return fmt.Errorf("load config: %w", err)
 		}
-		
+
 		configEnvVars, err := a.loadSecretsFromConfig(cfg, opts.KVMount, opts.TransitMount, effectiveEncryptionKey)
 		if err != nil {
 			return fmt.Errorf("load secrets from config: %w", err)
@@ -345,7 +345,7 @@ func (a *App) Run(opts *RunOptions) error {
 			envVars[k] = v
 		}
 	}
-	
+
 	// Load inline injected secrets
 	if len(opts.InjectSecrets) > 0 {
 		injectEnvVars, err := a.loadInlineSecrets(opts.InjectSecrets, opts.KVMount, opts.TransitMount, effectiveEncryptionKey)
@@ -356,7 +356,7 @@ func (a *App) Run(opts *RunOptions) error {
 			envVars[k] = v
 		}
 	}
-	
+
 	// If dry-run, just print the environment variables
 	if opts.DryRun {
 		fmt.Println("Environment variables that would be set:")
@@ -366,7 +366,7 @@ func (a *App) Run(opts *RunOptions) error {
 		fmt.Printf("\nCommand that would be executed: %s %s\n", opts.Command, strings.Join(opts.Args, " "))
 		return nil
 	}
-	
+
 	// Execute the command
 	return a.executeCommand(opts.Command, opts.Args, envVars)
 }
@@ -379,13 +379,13 @@ func (a *App) GenerateEnvFile(configPath, outputPath string, encryptionKey strin
 	}
 
 	effectiveEncryptionKey := config.GetEncryptionKey(encryptionKey)
-	
+
 	// Use the shared logic for loading secrets
 	envVars, err := a.loadSecretsFromConfig(cfg, "kv", "transit", effectiveEncryptionKey)
 	if err != nil {
 		return fmt.Errorf("load secrets from config: %w", err)
 	}
-	
+
 	// Convert to env file format
 	var envLines []string
 	for k, v := range envVars {
@@ -410,7 +410,7 @@ func (a *App) GenerateEnvFile(configPath, outputPath string, encryptionKey strin
 
 // loadEnvFileForRun loads environment variables from a .env file
 func (a *App) loadEnvFileForRun(path string) (map[string]string, error) {
-	// Use godotenv to parse the .env file  
+	// Use godotenv to parse the .env file
 	envMap, err := godotenv.Read(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read .env file: %w", err)
@@ -421,7 +421,7 @@ func (a *App) loadEnvFileForRun(path string) (map[string]string, error) {
 // loadSecretsFromConfig loads secrets from YAML config and returns as env vars
 func (a *App) loadSecretsFromConfig(cfg *config.Config, kvMount, transitMount, encryptionKey string) (map[string]string, error) {
 	envVars := make(map[string]string)
-	
+
 	for _, secret := range cfg.Secrets {
 		if secret.IsPathAllKeys() {
 			// New format: load all keys from a path as environment variables
@@ -455,32 +455,32 @@ func (a *App) loadSecretsFromConfig(cfg *config.Config, kvMount, transitMount, e
 			continue
 		}
 	}
-	
+
 	return envVars, nil
 }
 
 // loadAllKeysFromPath loads all keys from a Vault path as environment variables
 func (a *App) loadAllKeysFromPath(cfg *config.Config, vaultPath, kvMount, transitMount, encryptionKey string) (map[string]string, error) {
 	envVars := make(map[string]string)
-	
+
 	// Get all data from the Vault path
 	data, err := a.vaultClient.KVGet(config.NonEmpty("", cfg.KV.Mount, kvMount), vaultPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get secrets from path %s: %w", vaultPath, err)
 	}
-	
+
 	// Handle encrypted multi-value data
 	if utils.IsEncryptedMultiValue(data) {
 		encKeyForDecrypt := config.NonEmpty(encryptionKey, cfg.GetTransitKey(), "")
 		if encKeyForDecrypt == "" {
 			return nil, fmt.Errorf("encryption key required for encrypted secrets at path %s", vaultPath)
 		}
-		
+
 		decryptedData, err := utils.DecryptMultiValueData(data, a.vaultClient, cfg.GetTransitMount(transitMount), encKeyForDecrypt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decrypt secrets from path %s: %w", vaultPath, err)
 		}
-		
+
 		// Convert all decrypted keys to env vars
 		for key, value := range decryptedData {
 			envVars[strings.ToUpper(key)] = fmt.Sprintf("%v", value)
@@ -494,7 +494,7 @@ func (a *App) loadAllKeysFromPath(cfg *config.Config, vaultPath, kvMount, transi
 			}
 			envVars[strings.ToUpper(key)] = fmt.Sprintf("%v", value)
 		}
-		
+
 		// Handle single value case
 		if len(envVars) == 0 {
 			if value, ok := data["value"]; ok {
@@ -505,11 +505,11 @@ func (a *App) loadAllKeysFromPath(cfg *config.Config, vaultPath, kvMount, transi
 			}
 		}
 	}
-	
+
 	if len(envVars) == 0 {
 		return nil, fmt.Errorf("no valid secrets found at path %s", vaultPath)
 	}
-	
+
 	return envVars, nil
 }
 
@@ -551,19 +551,19 @@ func (a *App) loadSingleKeyFromPath(cfg *config.Config, secret *config.SecretEnt
 	if err != nil {
 		return "", fmt.Errorf("failed to get secrets from path %s: %w", secret.Path, err)
 	}
-	
+
 	// Handle encrypted multi-value data
 	if utils.IsEncryptedMultiValue(data) {
 		encKeyForDecrypt := config.NonEmpty(encryptionKey, cfg.GetTransitKey(), "")
 		if encKeyForDecrypt == "" {
 			return "", fmt.Errorf("encryption key required for encrypted secrets at path %s", secret.Path)
 		}
-		
+
 		decryptedData, err := utils.DecryptMultiValueData(data, a.vaultClient, cfg.GetTransitMount(transitMount), encKeyForDecrypt)
 		if err != nil {
 			return "", fmt.Errorf("failed to decrypt secrets from path %s: %w", secret.Path, err)
 		}
-		
+
 		// Extract the specific key
 		value, ok := decryptedData[secret.Key]
 		if !ok {
@@ -583,29 +583,29 @@ func (a *App) loadSingleKeyFromPath(cfg *config.Config, secret *config.SecretEnt
 // loadInlineSecrets loads secrets specified via --inject flags
 func (a *App) loadInlineSecrets(injectSecrets []string, kvMount, transitMount, encryptionKey string) (map[string]string, error) {
 	envVars := make(map[string]string)
-	
+
 	for _, inject := range injectSecrets {
 		// Parse ENV_VAR=vault_path format
 		parts := strings.SplitN(inject, "=", 2)
 		if len(parts) != 2 {
 			return nil, fmt.Errorf("invalid inject format: %s (expected ENV_VAR=vault_path)", inject)
 		}
-		
+
 		envVar := strings.TrimSpace(parts[0])
 		vaultPath := strings.TrimSpace(parts[1])
-		
+
 		if envVar == "" || vaultPath == "" {
 			return nil, fmt.Errorf("invalid inject format: %s (empty env var or vault path)", inject)
 		}
-		
+
 		// Get secret from Vault
 		data, err := a.vaultClient.KVGet(kvMount, vaultPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get secret %s: %w", vaultPath, err)
 		}
-		
+
 		var secretValue string
-		
+
 		// Handle different secret types
 		if ciphertext, ok := data["ciphertext"].(string); ok && strings.HasPrefix(ciphertext, "vault:v") {
 			// Single encrypted value
@@ -629,10 +629,10 @@ func (a *App) loadInlineSecrets(injectSecrets []string, kvMount, transitMount, e
 		} else {
 			return nil, fmt.Errorf("secret %s contains multiple values, cannot inject as single environment variable", vaultPath)
 		}
-		
+
 		envVars[envVar] = secretValue
 	}
-	
+
 	return envVars, nil
 }
 
@@ -691,14 +691,14 @@ func (a *App) executeCommand(command string, args []string, envVars map[string]s
 	for k, v := range envVars {
 		envSlice = append(envSlice, fmt.Sprintf("%s=%s", k, v))
 	}
-	
+
 	// Create the command
 	cmd := exec.Command(command, args...)
 	cmd.Env = envSlice
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
-	
+
 	// Run the command and wait for it to complete
 	err := cmd.Run()
 	if err != nil {
@@ -710,6 +710,6 @@ func (a *App) executeCommand(command string, args []string, envVars map[string]s
 		}
 		return fmt.Errorf("command execution failed: %w", err)
 	}
-	
+
 	return nil
 }

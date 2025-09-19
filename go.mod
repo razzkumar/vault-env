@@ -1,4 +1,4 @@
-module github.com/razzkumar/vault-env
+module github.com/razzkumar/vlt
 
 go 1.25.1
 

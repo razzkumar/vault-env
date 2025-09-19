@@ -1,4 +1,4 @@
-# vault-env
+# vlt
 
 A professional CLI tool for managing secrets with HashiCorp Vault using optional Transit encryption, inspired by [vaultx](https://github.com/hashicorp/vault) and [teller](https://github.com/tellerops/teller).
 
@@ -7,8 +7,8 @@ A professional CLI tool for managing secrets with HashiCorp Vault using optional
 ## Architecture
 
 ```
-vault-env/
-├── cmd/vault-env/          # Main application entry point
+vlt/
+├── cmd/vlt/          # Main application entry point
 ├── pkg/
 │   ├── config/             # Configuration management
 │   ├── vault/              # Vault client wrapper
@@ -56,10 +56,10 @@ vault-env/
 ### From Source
 
 ```bash
-git clone https://github.com/razzkumar/vault-env
-cd vault-env
-go build -o vault-env
-sudo mv vault-env /usr/local/bin/
+git clone https://github.com/razzkumar/vlt
+cd vlt
+go build -o vlt
+sudo mv vlt /usr/local/bin/
 ```
 
 ### Environment Variables
@@ -75,7 +75,7 @@ Optional:
 
 ## Vault Setup
 
-Before using vault-env, you need to set up Vault with the required engines and keys:
+Before using vlt, you need to set up Vault with the required engines and keys:
 
 ```bash
 # Enable KV v2 secrets engine
@@ -94,41 +94,41 @@ vault write -f transit/keys/app-secrets
 
 ```bash
 # Store single secret with encryption (default)
-vault-env put --key app-secrets --path myapp/db_password --value "supersecret"
+vlt put --key app-secrets --path myapp/db_password --value "supersecret"
 
 # Store single secret without encryption
-vault-env put --path myapp/db_password --value "supersecret" --no-encrypt
+vlt put --path myapp/db_password --value "supersecret" --no-encrypt
 
 # Store from stdin
-echo "supersecret" | vault-env put --key app-secrets --path myapp/db_password
+echo "supersecret" | vlt put --key app-secrets --path myapp/db_password
 
 # Store multiple secrets from .env file
-vault-env put --key app-secrets --path myapp/config --from-env production.env
+vlt put --key app-secrets --path myapp/config --from-env production.env
 
 # Store file content as base64 (useful for SSH keys, certificates)
-vault-env put --key app-secrets --path myapp/ssh_key --from-file ~/.ssh/id_rsa
+vlt put --key app-secrets --path myapp/ssh_key --from-file ~/.ssh/id_rsa
 ```
 
 ### Retrieve Secrets
 
 ```bash
 # Get single encrypted secret
-vault-env get --key app-secrets --path myapp/db_password
+vlt get --key app-secrets --path myapp/db_password
 
 # Get multiple secrets as JSON
-vault-env get --key app-secrets --path myapp/config --json
+vlt get --key app-secrets --path myapp/config --json
 
 # Get multiple secrets as .env format
-vault-env get --key app-secrets --path myapp/config
+vlt get --key app-secrets --path myapp/config
 
 # Get specific value from multi-value secret
-vault-env get --key app-secrets --path myapp/config --subkey AWS_ACCESS_KEY_ID
+vlt get --key app-secrets --path myapp/config --subkey AWS_ACCESS_KEY_ID
 
 # Get plaintext secret (no key needed)
-vault-env get --path myapp/plaintext_config --subkey EMAIL_FROM
+vlt get --path myapp/plaintext_config --subkey EMAIL_FROM
 
 # Use in environment variable
-export DB_PASSWORD=$(vault-env get --key app-secrets --path myapp/db_password)
+export DB_PASSWORD=$(vlt get --key app-secrets --path myapp/db_password)
 ```
 
 ### Generate .env File
@@ -160,10 +160,10 @@ Then generate the .env file:
 
 ```bash
 # Generate .env from config
-vault-env sync --config secrets.yaml --output .env
+vlt sync --config secrets.yaml --output .env
 
 # Or use the env command with CLI flags
-vault-env env --key app-secrets --config secrets.yaml --output .env
+vlt env --key app-secrets --config secrets.yaml --output .env
 ```
 
 ## Commands
@@ -173,7 +173,7 @@ vault-env env --key app-secrets --config secrets.yaml --output .env
 Store a secret in Vault with Transit encryption.
 
 ```bash
-vault-env put [flags]
+vlt put [flags]
 
 Flags:
   --key string            Transit key name (required)
@@ -188,7 +188,7 @@ Flags:
 Retrieve and decrypt a secret from Vault.
 
 ```bash
-vault-env get [flags]
+vlt get [flags]
 
 Flags:
   --key string            Transit key name (required)
@@ -202,7 +202,7 @@ Flags:
 Generate .env file from multiple Vault secrets using a config file.
 
 ```bash
-vault-env env [flags]
+vlt env [flags]
 
 Flags:
   --key string            Transit key name (required)
@@ -217,10 +217,10 @@ Flags:
 Sync secrets from YAML config to .env file. Uses configuration from the YAML file for all settings.
 
 ```bash
-vault-env sync [flags]
+vlt sync [flags]
 
 Flags:
-  --config string         YAML config file (default "vault-env.yaml")
+  --config string         YAML config file (default "vlt.yaml")
   --output string         Output .env file (default ".env")
 ```
 
@@ -267,8 +267,8 @@ export VAULT_TOKEN="your-vault-token"
 
 2. Store secrets:
 ```bash
-vault-env put --key app-secrets --path myapp/db_password --value "db_secret_123"
-vault-env put --key app-secrets --path myapp/api_key --value "api_key_456"
+vlt put --key app-secrets --path myapp/db_password --value "db_secret_123"
+vlt put --key app-secrets --path myapp/api_key --value "api_key_456"
 ```
 
 3. Create config file (`secrets.yaml`):
@@ -289,7 +289,7 @@ secrets:
 
 4. Generate .env file:
 ```bash
-vault-env sync --config secrets.yaml
+vlt sync --config secrets.yaml
 ```
 
 5. Use in your application:
@@ -301,9 +301,9 @@ echo "API Key: $API_KEY"
 
 ## Comparison with Teller
 
-While inspired by Teller, vault-env is focused specifically on HashiCorp Vault with Transit encryption:
+While inspired by Teller, vlt is focused specifically on HashiCorp Vault with Transit encryption:
 
-| Feature | vault-env | Teller |
+| Feature | vlt | Teller |
 |---------|-----------|---------|
 | Vault Support | ✅ Full | ✅ Full |
 | Transit Encryption | ✅ Built-in | ❌ Not supported |

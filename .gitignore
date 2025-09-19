@@ -1,6 +1,6 @@
 # Binary
-vault-env
-vault-env-*
+vlt
+vlt-*
 
 # Environment files
 .env
@@ -10,7 +10,7 @@ vault-env-*
 # Vault config files with secrets
 config.yaml
 secrets.yaml
-vault-env.yaml
+vlt.yaml
 
 # IDE
 .vscode/
