@@ -175,11 +175,55 @@ func (c *VaultConfig) DetectAuthMethod() string {
 }
 
 // GetEncryptionKey returns the encryption key from environment or parameter
+// If TRANSIT is enabled and no key is configured, returns default "app-secrets"
 func GetEncryptionKey(flagValue string) string {
 	if flagValue != "" {
 		return flagValue
 	}
-	return os.Getenv("ENCRYPTION_KEY")
+	
+	envKey := os.Getenv("ENCRYPTION_KEY")
+	if envKey != "" {
+		return envKey
+	}
+	
+	// If TRANSIT is enabled but no encryption key configured, use default
+	if IsTransitEnabled() {
+		return "app-secrets"
+	}
+	
+	return ""
+}
+
+// IsTransitEnabled returns true if transit encryption should be enabled
+// Checks TRANSIT environment variable for true/false or 1/0 values
+func IsTransitEnabled() bool {
+	transit := strings.ToLower(os.Getenv("TRANSIT"))
+	switch transit {
+	case "true", "1", "yes", "on", "enable", "enabled":
+		return true
+	case "false", "0", "no", "off", "disable", "disabled":
+		return false
+	default:
+		// If TRANSIT is not set or invalid, don't enable by default
+		return false
+	}
+}
+
+// ShouldUseEncryption determines if encryption should be used based on encryption key and TRANSIT env var
+func ShouldUseEncryption(encryptionKey string) bool {
+	// If encryption key is provided and TRANSIT is not explicitly disabled, use encryption
+	if encryptionKey != "" {
+		// Check if TRANSIT is explicitly disabled
+		transit := strings.ToLower(os.Getenv("TRANSIT"))
+		if transit == "false" || transit == "0" || transit == "no" || transit == "off" || transit == "disable" || transit == "disabled" {
+			return false
+		}
+		return true
+	}
+	
+	// If no encryption key but TRANSIT is enabled, we still can't encrypt without a key
+	// This will be handled by the calling code
+	return IsTransitEnabled()
 }
 
 // NonEmpty returns the first non-empty string from the provided values

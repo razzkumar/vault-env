@@ -111,6 +111,7 @@ ENVIRONMENT VARIABLES:
   VAULT_CACERT       CA certificate path (optional)
   VAULT_SKIP_VERIFY  Skip TLS verification (optional)
   ENCRYPTION_KEY     Default transit encryption key (optional)
+  TRANSIT            Enable/disable transit encryption: true/false, 1/0, yes/no, on/off (optional)
   
   Authentication (auto-detected or explicit):
   VAULT_AUTH_METHOD  Auth method: token, approle, github, kubernetes (optional)
@@ -146,8 +147,11 @@ EXAMPLES:
   # Store using environment variable for encryption key
   ENCRYPTION_KEY=mykey vault-env put --path secrets/db_password --value "supersecret"
   
-  # Store without encryption
-  vault-env put --path secrets/db_password --value "supersecret"
+  # Enable transit encryption with TRANSIT environment variable
+  TRANSIT=true ENCRYPTION_KEY=mykey vault-env put --path secrets/db_password --value "supersecret"
+  
+  # Store without encryption (disable transit even if key is set)
+  TRANSIT=false vault-env put --path secrets/db_password --value "supersecret"
   
   # Store multiple secrets from .env file (merges with existing)
   vault-env put --encryption-key mykey --path secrets/myapp --from-env .env
@@ -175,6 +179,12 @@ EXAMPLES:
   
   # Run command with secrets injected
   vault-env run --config secrets.yaml -- go run main.go
+  
+  # Convert .env file to JSON with encryption
+  TRANSIT=true ENCRYPTION_KEY=mykey vault-env json
+  
+  # Convert .env file to plaintext JSON
+  vault-env json example.env
   
   # Generate shell completion
   vault-env completion fish > ~/.config/fish/completions/vault-env.fish`,

@@ -12,14 +12,14 @@ import (
 )
 
 // LoadEnvFileAsPlaintext loads a .env file and returns plaintext data map (no vault client needed)
-func LoadEnvFileAsPlaintext(path string) (map[string]interface{}, error) {
+func LoadEnvFileAsPlaintext(path string) (map[string]any, error) {
 	// Use godotenv to parse the .env file
 	envMap, err := godotenv.Read(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read .env file: %w", err)
 	}
 
-	data := make(map[string]interface{})
+	data := make(map[string]any)
 	for key, value := range envMap {
 		data[key] = value
 	}
@@ -28,14 +28,14 @@ func LoadEnvFileAsPlaintext(path string) (map[string]interface{}, error) {
 }
 
 // LoadEnvFile loads a .env file and returns encrypted/plaintext data map
-func LoadEnvFile(path string, client *vault.Client, transitMount, keyName string, useEncryption bool) (map[string]interface{}, error) {
+func LoadEnvFile(path string, client *vault.Client, transitMount, keyName string, useEncryption bool) (map[string]any, error) {
 	// Use godotenv to parse the .env file
 	envMap, err := godotenv.Read(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read .env file: %w", err)
 	}
 
-	data := make(map[string]interface{})
+	data := make(map[string]any)
 
 	for key, value := range envMap {
 		if useEncryption {
@@ -53,7 +53,7 @@ func LoadEnvFile(path string, client *vault.Client, transitMount, keyName string
 }
 
 // LoadFileAsBase64 reads a file and encodes it as base64
-func LoadFileAsBase64(path string, client *vault.Client, transitMount, keyName string, useEncryption bool) (map[string]interface{}, error) {
+func LoadFileAsBase64(path string, client *vault.Client, transitMount, keyName string, useEncryption bool) (map[string]any, error) {
 	fileContent, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read file: %w", err)
@@ -66,14 +66,14 @@ func LoadFileAsBase64(path string, client *vault.Client, transitMount, keyName s
 		if err != nil {
 			return nil, fmt.Errorf("encrypt file content: %w", err)
 		}
-		return map[string]interface{}{"ciphertext": ciphertext}, nil
+		return map[string]any{"ciphertext": ciphertext}, nil
 	}
 
-	return map[string]interface{}{"value": base64Content}, nil
+	return map[string]any{"value": base64Content}, nil
 }
 
 // IsEncryptedSingleValue checks if data contains a single encrypted value
-func IsEncryptedSingleValue(data map[string]interface{}) bool {
+func IsEncryptedSingleValue(data map[string]any) bool {
 	if len(data) != 1 {
 		return false
 	}
@@ -82,7 +82,7 @@ func IsEncryptedSingleValue(data map[string]interface{}) bool {
 }
 
 // IsPlaintextSingleValue checks if data contains a single plaintext value
-func IsPlaintextSingleValue(data map[string]interface{}) bool {
+func IsPlaintextSingleValue(data map[string]any) bool {
 	if len(data) != 1 {
 		return false
 	}
@@ -91,11 +91,11 @@ func IsPlaintextSingleValue(data map[string]interface{}) bool {
 }
 
 // IsEncryptedMultiValue checks if data contains multiple encrypted values
-func IsEncryptedMultiValue(data map[string]interface{}) bool {
+func IsEncryptedMultiValue(data map[string]any) bool {
 	if len(data) == 0 {
 		return false
 	}
-	
+
 	for _, v := range data {
 		if str, ok := v.(string); ok && strings.HasPrefix(str, "vault:v") {
 			return true
@@ -105,9 +105,9 @@ func IsEncryptedMultiValue(data map[string]interface{}) bool {
 }
 
 // DecryptMultiValueData decrypts all encrypted values in a data map
-func DecryptMultiValueData(data map[string]interface{}, client *vault.Client, transitMount, keyName string) (map[string]interface{}, error) {
-	decryptedData := make(map[string]interface{})
-	
+func DecryptMultiValueData(data map[string]any, client *vault.Client, transitMount, keyName string) (map[string]any, error) {
+	decryptedData := make(map[string]any)
+
 	for k, v := range data {
 		if ciphertext, ok := v.(string); ok && strings.HasPrefix(ciphertext, "vault:v") {
 			plaintext, err := client.TransitDecrypt(transitMount, keyName, ciphertext)
@@ -119,12 +119,12 @@ func DecryptMultiValueData(data map[string]interface{}, client *vault.Client, tr
 			decryptedData[k] = v
 		}
 	}
-	
+
 	return decryptedData, nil
 }
 
 // OutputJSON outputs data as formatted JSON
-func OutputJSON(data map[string]interface{}) error {
+func OutputJSON(data map[string]any) error {
 	jsonData, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal json: %w", err)
@@ -134,25 +134,25 @@ func OutputJSON(data map[string]interface{}) error {
 }
 
 // OutputEnvFormat outputs data in .env format
-func OutputEnvFormat(data map[string]interface{}) {
+func OutputEnvFormat(data map[string]any) {
 	for k, v := range data {
 		fmt.Printf("%s=%v\n", k, v)
 	}
 }
 
 // MergeData merges new data into existing data, preserving existing values and adding/updating new ones
-func MergeData(existing, new map[string]interface{}) map[string]interface{} {
-	result := make(map[string]interface{})
-	
+func MergeData(existing, new map[string]any) map[string]any {
+	result := make(map[string]any)
+
 	// Copy existing data
 	for k, v := range existing {
 		result[k] = v
 	}
-	
+
 	// Add/update with new data
 	for k, v := range new {
 		result[k] = v
 	}
-	
+
 	return result
 }

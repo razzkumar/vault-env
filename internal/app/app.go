@@ -646,7 +646,7 @@ type JSONOptions struct {
 // JSON encrypts .env file content and outputs as JSON
 func (a *App) JSON(opts *JSONOptions) error {
 	effectiveEncryptionKey := config.GetEncryptionKey(opts.EncryptionKey)
-	useEncryption := effectiveEncryptionKey != ""
+	useEncryption := config.ShouldUseEncryption(effectiveEncryptionKey)
 
 	// Default to .env if no file specified
 	envFile := opts.EnvFile

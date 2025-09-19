@@ -355,18 +355,28 @@ func getJSONCommand() *cli.Command {
 
 This command is useful for converting .env files to encrypted JSON format that can be stored in Vault or other secure storage systems.
 
+Encryption is controlled by:
+  1. TRANSIT environment variable (true/false, 1/0, yes/no, on/off, enable/disable)
+  2. --encryption-key flag or ENCRYPTION_KEY environment variable
+
 Examples:
-  # Encrypt default .env file
+  # Output plaintext JSON (default behavior)
   vault-env json
   
-  # Encrypt specific file
+  # Output plaintext JSON from specific file
   vault-env json example.env
   
-  # Encrypt with specific transit key
+  # Enable encryption with TRANSIT environment variable
+  TRANSIT=true ENCRYPTION_KEY=mykey vault-env json
+  
+  # Enable encryption with command flag
   vault-env json --encryption-key mykey
   
-  # Output plaintext JSON (no encryption)
-  vault-env json --encryption-key=""`,
+  # Disable encryption even if encryption key is set
+  TRANSIT=false ENCRYPTION_KEY=mykey vault-env json
+  
+  # Enable encryption with environment variables
+  TRANSIT=1 ENCRYPTION_KEY=mykey vault-env json example.env`,
 		ArgsUsage: "[env-file]",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
@@ -386,13 +396,18 @@ Examples:
 				envFile = ".env"
 			}
 
-			// Check if encryption is needed
+			// Check if encryption is needed based on encryption key and TRANSIT env var
 			encryptionKey := config.GetEncryptionKey(ctx.String("encryption-key"))
-			useEncryption := encryptionKey != ""
+			useEncryption := config.ShouldUseEncryption(encryptionKey)
 
 			if !useEncryption {
 				// For plaintext output, don't need vault client
 				return handlePlaintextJSON(envFile)
+			}
+
+			// If TRANSIT is enabled but no encryption key, return error
+			if config.IsTransitEnabled() && encryptionKey == "" {
+				return fmt.Errorf("TRANSIT is enabled but no encryption key provided. Set ENCRYPTION_KEY or use --encryption-key flag")
 			}
 
 			// For encryption, create app with vault client
