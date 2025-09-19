@@ -359,6 +359,10 @@ Encryption is controlled by:
   1. TRANSIT environment variable (true/false, 1/0, yes/no, on/off, enable/disable)
   2. --encryption-key flag or ENCRYPTION_KEY environment variable
 
+Defaults when TRANSIT=true:
+  - ENCRYPTION_KEY defaults to "app-secrets"
+  - TRANSIT_MOUNT defaults to "transit"
+
 Examples:
   # Output plaintext JSON (default behavior)
   vault-env json
@@ -366,7 +370,10 @@ Examples:
   # Output plaintext JSON from specific file
   vault-env json example.env
   
-  # Enable encryption with TRANSIT environment variable
+  # Enable encryption with defaults (key="app-secrets", mount="transit")
+  TRANSIT=true vault-env json
+  
+  # Enable encryption with custom key
   TRANSIT=true ENCRYPTION_KEY=mykey vault-env json
   
   # Enable encryption with command flag
@@ -375,8 +382,8 @@ Examples:
   # Disable encryption even if encryption key is set
   TRANSIT=false ENCRYPTION_KEY=mykey vault-env json
   
-  # Enable encryption with environment variables
-  TRANSIT=1 ENCRYPTION_KEY=mykey vault-env json example.env`,
+  # Use custom transit mount
+  TRANSIT=true TRANSIT_MOUNT=custom-transit vault-env json example.env`,
 		ArgsUsage: "[env-file]",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
@@ -405,11 +412,6 @@ Examples:
 				return handlePlaintextJSON(envFile)
 			}
 
-			// If TRANSIT is enabled but no encryption key, return error
-			if config.IsTransitEnabled() && encryptionKey == "" {
-				return fmt.Errorf("TRANSIT is enabled but no encryption key provided. Set ENCRYPTION_KEY or use --encryption-key flag")
-			}
-
 			// For encryption, create app with vault client
 			appInstance, err := app.New()
 			if err != nil {
@@ -417,7 +419,7 @@ Examples:
 			}
 
 			opts := &app.JSONOptions{
-				TransitMount:  ctx.String("transit-mount"),
+				TransitMount:  config.GetTransitMount(ctx.String("transit-mount")),
 				EncryptionKey: ctx.String("encryption-key"),
 				EnvFile:       envFile,
 			}

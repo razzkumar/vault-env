@@ -110,8 +110,9 @@ ENVIRONMENT VARIABLES:
   VAULT_NAMESPACE    Vault namespace (optional)
   VAULT_CACERT       CA certificate path (optional)
   VAULT_SKIP_VERIFY  Skip TLS verification (optional)
-  ENCRYPTION_KEY     Default transit encryption key (optional)
+  ENCRYPTION_KEY     Default transit encryption key (defaults to "app-secrets" when TRANSIT=true)
   TRANSIT            Enable/disable transit encryption: true/false, 1/0, yes/no, on/off (optional)
+  TRANSIT_MOUNT      Transit mount path (defaults to "transit" when TRANSIT=true)
   
   Authentication (auto-detected or explicit):
   VAULT_AUTH_METHOD  Auth method: token, approle, github, kubernetes (optional)
@@ -147,7 +148,10 @@ EXAMPLES:
   # Store using environment variable for encryption key
   ENCRYPTION_KEY=mykey vault-env put --path secrets/db_password --value "supersecret"
   
-  # Enable transit encryption with TRANSIT environment variable
+  # Enable transit encryption with defaults (key="app-secrets", mount="transit")
+  TRANSIT=true vault-env put --path secrets/db_password --value "supersecret"
+  
+  # Enable transit encryption with custom key
   TRANSIT=true ENCRYPTION_KEY=mykey vault-env put --path secrets/db_password --value "supersecret"
   
   # Store without encryption (disable transit even if key is set)
@@ -180,8 +184,8 @@ EXAMPLES:
   # Run command with secrets injected
   vault-env run --config secrets.yaml -- go run main.go
   
-  # Convert .env file to JSON with encryption
-  TRANSIT=true ENCRYPTION_KEY=mykey vault-env json
+  # Convert .env file to JSON with encryption (uses defaults)
+  TRANSIT=true vault-env json
   
   # Convert .env file to plaintext JSON
   vault-env json example.env

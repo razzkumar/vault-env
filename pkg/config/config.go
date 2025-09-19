@@ -209,8 +209,29 @@ func IsTransitEnabled() bool {
 	}
 }
 
+// GetTransitMount returns the transit mount path with default fallback
+// If TRANSIT is enabled and no mount is configured, returns default "transit"
+func GetTransitMount(flagValue string) string {
+	if flagValue != "" {
+		return flagValue
+	}
+	
+	envMount := os.Getenv("TRANSIT_MOUNT")
+	if envMount != "" {
+		return envMount
+	}
+	
+	// Default to "transit" (this is already the default in CLI flags, but good to be explicit)
+	return "transit"
+}
+
 // ShouldUseEncryption determines if encryption should be used based on encryption key and TRANSIT env var
 func ShouldUseEncryption(encryptionKey string) bool {
+	// If TRANSIT is explicitly enabled, use encryption
+	if IsTransitEnabled() {
+		return true
+	}
+	
 	// If encryption key is provided and TRANSIT is not explicitly disabled, use encryption
 	if encryptionKey != "" {
 		// Check if TRANSIT is explicitly disabled
@@ -221,9 +242,8 @@ func ShouldUseEncryption(encryptionKey string) bool {
 		return true
 	}
 	
-	// If no encryption key but TRANSIT is enabled, we still can't encrypt without a key
-	// This will be handled by the calling code
-	return IsTransitEnabled()
+	// Default: no encryption
+	return false
 }
 
 // NonEmpty returns the first non-empty string from the provided values
